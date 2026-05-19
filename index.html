@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#E32219" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#9e1610" media="(prefers-color-scheme: dark)">
+<meta name="description" content="VfB Stuttgart Fanclub Supporters Freudental - Anwesenheitserfassung Saison 2025/26">
+<meta name="format-detection" content="telephone=no">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<!-- iOS Standalone-Modus -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Supporters">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Supporters Freudental">
+
+<!-- Icons: iOS nutzt apple-touch-icon, Android nutzt manifest.json -->
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
+<link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
+<link rel="apple-touch-icon" sizes="120x120" href="apple-touch-icon-120.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<title>Supporters Freudental - Fanclub</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+input,textarea{-webkit-user-select:text;user-select:text}
+html,body{height:100%;overscroll-behavior:none;-webkit-overflow-scrolling:touch}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:#f4f5f7;color:#1a1a1a;font-size:15px;line-height:1.4;padding-bottom:env(safe-area-inset-bottom);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+/* In Standalone-Mode: roter Hintergrund hinter Statusleiste/Notch */
+body{background:#E32219}
+.app{max-width:560px;margin:0 auto;min-height:100vh;background:#f4f5f7;display:flex;flex-direction:column;padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+header{background:linear-gradient(135deg,#E32219 0%,#9e1610 100%);color:#fff;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+header .logo{display:block;height:48px;width:auto;margin:0 auto 2px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.15)}
+header h1{font-size:18px;font-weight:800;letter-spacing:.3px;text-align:center;display:none}
+header .sub{font-size:11px;opacity:.85;margin-top:2px;font-weight:500;text-align:center}
+header .head-actions{position:absolute;right:8px;top:calc(env(safe-area-inset-top) + 8px);display:flex;gap:4px}
+header .head-actions button{background:rgba(255,255,255,.18);border:0;color:#fff;width:36px;height:36px;border-radius:8px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.tabbar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e1e3e8;display:flex;justify-content:space-around;padding:6px env(safe-area-inset-right) calc(env(safe-area-inset-bottom) + 6px) env(safe-area-inset-left);z-index:99;max-width:560px;margin:0 auto;backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);background:rgba(255,255,255,.92)}
+.tabbar button{flex:1;background:0;border:0;padding:6px 4px;font-size:10px;color:#777;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbar button .ic{font-size:22px;line-height:1}
+.tabbar button.active{color:#E32219}
+.page{display:none;padding:14px;flex:1}
+.page.active{display:block}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card h2{font-size:14px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.stat-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat{background:#fff;border-radius:12px;padding:12px 8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.stat .v{font-size:22px;font-weight:800;color:#E32219}
+.stat .l{font-size:10px;color:#777;font-weight:600;text-transform:uppercase;margin-top:2px}
+.filter-chips{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.chip{background:#fff;border:1px solid #d8dae0;border-radius:18px;padding:6px 12px;font-size:12px;font-weight:600;color:#555;white-space:nowrap;cursor:pointer;transition:.15s}
+.chip.active{background:#E32219;color:#fff;border-color:#E32219}
+.match{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:transform .1s}
+.match:active{transform:scale(.98)}
+.match-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.match-date{font-size:11px;color:#888;font-weight:600;flex-shrink:0}
+.match-badge{font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.badge-bl{background:#fde8e6;color:#E32219}
+.badge-dfb{background:#e8f4fd;color:#1972c4}
+.badge-el{background:#fff3e0;color:#e67e00}
+.badge-sc{background:#f0e8fd;color:#7b3fbf}
+.match-loc{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px}
+.match-loc.h{background:#e7f6ec;color:#1f8a3a}
+.match-loc.a{background:#fef1f0;color:#b22d24}
+.match-teams{font-weight:600;font-size:15px;color:#222}
+.match-stats{margin-top:8px;padding-top:8px;border-top:1px solid #f0f1f4;font-size:12px;color:#666;display:flex;justify-content:space-between;align-items:center}
+.attendance-pill{background:#E32219;color:#fff;padding:3px 10px;border-radius:10px;font-weight:700;font-size:11px}
+.attendance-pill.zero{background:#d8dae0;color:#666}
+.member-list{display:flex;flex-direction:column;gap:6px}
+.member{background:#fff;border-radius:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.member .avatar{width:36px;height:36px;border-radius:50%;background:#E32219;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.member .name{flex:1;font-weight:600}
+.member .count{font-size:12px;color:#666;font-weight:600;background:#f4f5f7;padding:3px 8px;border-radius:8px}
+.member .del{background:0;border:0;color:#c33;font-size:18px;cursor:pointer;padding:4px 8px}
+.add-row{display:flex;gap:8px;margin-bottom:12px}
+.add-row input{flex:1;padding:11px 12px;border:1px solid #d8dae0;border-radius:10px;font-size:15px;background:#fff;font-family:inherit}
+.add-row input:focus{outline:0;border-color:#E32219}
+.btn{background:#E32219;color:#fff;border:0;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn:active{opacity:.85}
+.btn-sec{background:#fff;color:#222;border:1px solid #d8dae0}
+.btn-block{width:100%;margin-bottom:8px}
+.empty{text-align:center;padding:40px 20px;color:#888}
+.empty .ic{font-size:50px;margin-bottom:10px;opacity:.4}
+.detail-hdr{background:linear-gradient(135deg,#E32219 0%,#9e1610 100%);color:#fff;padding:14px;border-radius:12px;margin-bottom:12px;position:relative}
+.detail-hdr .back{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.15);border:0;color:#fff;width:36px;height:36px;border-radius:50%;font-size:20px;cursor:pointer}
+.detail-hdr h2{font-size:17px;font-weight:700;text-align:center;padding:0 40px}
+.detail-hdr .meta{text-align:center;font-size:11px;opacity:.9;margin-top:4px}
+.attend-row{background:#fff;border-radius:10px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:.15s}
+.attend-row.on{background:#e7f6ec;border-left:4px solid #1f8a3a}
+.attend-row .avatar{width:36px;height:36px;border-radius:50%;background:#d8dae0;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
+.attend-row.on .avatar{background:#1f8a3a}
+.attend-row .name{flex:1;font-weight:600}
+.attend-row .check{width:26px;height:26px;border-radius:50%;border:2px solid #d8dae0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0;transition:.15s}
+.attend-row.on .check{background:#1f8a3a;border-color:#1f8a3a}
+.rank-row{background:#fff;border-radius:10px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.rank-pos{font-size:18px;font-weight:800;color:#999;width:30px;flex-shrink:0;text-align:center}
+.rank-pos.gold{color:#d4af37}.rank-pos.silver{color:#a8a8a8}.rank-pos.bronze{color:#cd7f32}
+.rank-info{flex:1}
+.rank-name{font-weight:700;font-size:15px}
+.rank-detail{font-size:11px;color:#888;margin-top:2px;display:flex;gap:10px}
+.rank-detail span{display:flex;align-items:center;gap:3px}
+.rank-quota{font-size:18px;font-weight:800;color:#E32219;flex-shrink:0}
+.rank-bar{height:5px;background:#f0f1f4;border-radius:3px;margin-top:6px;overflow:hidden}
+.rank-bar-fill{height:100%;background:linear-gradient(90deg,#E32219,#9e1610);border-radius:3px;transition:width .4s}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;width:100%;max-width:560px;border-radius:16px 16px 0 0;padding:18px;max-height:80vh;overflow-y:auto}
+.modal h3{margin-bottom:12px;font-size:16px}
+.modal p{margin-bottom:14px;font-size:14px;color:#555}
+.modal .row{display:flex;gap:8px}
+.modal .row .btn{flex:1}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.install-banner{background:#fff8e0;border:1px solid #f1d976;color:#7a5500;padding:10px 12px;border-radius:10px;margin-bottom:12px;font-size:12px;display:none;align-items:center;gap:10px}
+.install-banner.show{display:flex}
+.install-banner .ic{font-size:20px}
+.install-banner button{background:#f1c40f;border:0;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:700;cursor:pointer;margin-left:auto}
+hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
+.muted{color:#888;font-size:12px}
+.section-title{font-size:12px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin:14px 4px 8px}
+.sync-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;background:rgba(255,255,255,.18);color:#fff;margin-top:4px;cursor:pointer}
+.sync-pill .dot{width:8px;height:8px;border-radius:50%;background:#999}
+.sync-pill.ok .dot{background:#3ddc84;box-shadow:0 0 6px #3ddc84}
+.sync-pill.syncing .dot{background:#f5d142;animation:pulse 1s infinite}
+.sync-pill.error .dot{background:#ff6b6b;box-shadow:0 0 6px #ff6b6b}
+.sync-pill.offline .dot{background:#bbb}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.form-group input{width:100%;padding:10px 12px;border:1px solid #d8dae0;border-radius:8px;font-size:14px;background:#fff;font-family:inherit}
+.form-group input:focus{outline:0;border-color:#E32219}
+.form-group .hint{font-size:11px;color:#888;margin-top:3px;line-height:1.4}
+.status-line{display:flex;justify-content:space-between;font-size:12px;color:#666;padding:6px 0;border-bottom:1px solid #f0f1f4}
+.status-line:last-child{border-bottom:0}
+.status-line strong{color:#222}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <img src="apple-touch-icon-120.png" class="logo" alt="Supporters Freudental">
+    <h1>Supporters Freudental</h1>
+    <div class="sub">Saison 2025/26</div>
+    <div class="sync-pill" id="syncPill" onclick="ui.sync(false)">
+      <span class="dot"></span><span id="syncText">Nicht verbunden</span>
+    </div>
+    <div class="head-actions">
+      <button onclick="ui.showSettings()" title="Einstellungen">&#9881;</button>
+    </div>
+  </header>
+
+  <!-- Dashboard -->
+  <div class="page active" id="page-dashboard">
+    <div class="install-banner" id="installBanner">
+      <span class="ic">&#128241;</span>
+      <span>Als App auf Startbildschirm installieren f&uuml;r besten Komfort</span>
+      <button onclick="ui.installApp()">Installieren</button>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><div class="v" id="stat-members">0</div><div class="l">Mitglieder</div></div>
+      <div class="stat"><div class="v" id="stat-games-done">0</div><div class="l">Erfasste Spiele</div></div>
+      <div class="stat"><div class="v" id="stat-avg">0</div><div class="l">&Oslash; Besucher</div></div>
+    </div>
+
+    <div class="card">
+      <h2>N&auml;chste Spiele</h2>
+      <div id="upcoming-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>Top 3 Treueste Fans</h2>
+      <div id="top-fans"></div>
+    </div>
+  </div>
+
+  <!-- Spiele -->
+  <div class="page" id="page-matches">
+    <div class="filter-chips" id="filter-chips">
+      <button class="chip active" data-f="all">Alle</button>
+      <button class="chip" data-f="BL">Bundesliga</button>
+      <button class="chip" data-f="DFB">DFB-Pokal</button>
+      <button class="chip" data-f="EL">Europa League</button>
+      <button class="chip" data-f="SC">Supercup</button>
+      <button class="chip" data-f="H">Nur Heim</button>
+      <button class="chip" data-f="A">Nur Ausw&auml;rts</button>
+    </div>
+    <div id="matches-list"></div>
+  </div>
+
+  <!-- Mitglieder -->
+  <div class="page" id="page-members">
+    <div class="add-row">
+      <input type="text" id="newMemberName" placeholder="Vor- und Nachname" maxlength="40">
+      <button class="btn" onclick="ui.addMember()">+</button>
+    </div>
+    <div class="member-list" id="member-list"></div>
+  </div>
+
+  <!-- Statistik -->
+  <div class="page" id="page-stats">
+    <div class="filter-chips">
+      <button class="chip active" data-stat="all">Gesamt</button>
+      <button class="chip" data-stat="H">Heim</button>
+      <button class="chip" data-stat="A">Ausw&auml;rts</button>
+      <button class="chip" data-stat="BL">Bundesliga</button>
+      <button class="chip" data-stat="DFB">Pokal</button>
+      <button class="chip" data-stat="EL">Europa</button>
+    </div>
+    <div id="ranking-list"></div>
+  </div>
+
+  <!-- Spieldetail -->
+  <div class="page" id="page-match-detail">
+    <div class="detail-hdr">
+      <button class="back" onclick="ui.showPage('matches')">&larr;</button>
+      <h2 id="md-title">-</h2>
+      <div class="meta" id="md-meta">-</div>
+    </div>
+    <div class="card" style="padding:10px 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong id="md-count">0 von 0 anwesend</strong>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(true)">Alle</button>
+          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(false)">Keiner</button>
+        </div>
+      </div>
+    </div>
+    <div id="attend-list"></div>
+  </div>
+
+  </div>
+
+<nav class="tabbar">
+  <button class="active" data-page="dashboard"><span class="ic">&#127968;</span><span>Start</span></button>
+  <button data-page="matches"><span class="ic">&#9917;</span><span>Spiele</span></button>
+  <button data-page="members"><span class="ic">&#128101;</span><span>Mitglieder</span></button>
+  <button data-page="stats"><span class="ic">&#128202;</span><span>Statistik</span></button>
+</nav>
+
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// === DATEN ===
+// Spielplan VfB Stuttgart 2025/26 (Quelle: kicker.de)
+// type: BL=Bundesliga, DFB=DFB-Pokal, EL=Europa League, SC=Supercup
+// loc: H=Heim, A=Auswaerts
+const SCHEDULE = [
+  // Supercup
+  {id:'sc1', date:'2025-08-16', type:'SC', loc:'H', opp:'Bayern M&uuml;nchen', round:'Supercup Finale'},
+  // Bundesliga
+  {id:'bl1', date:'2025-08-23', type:'BL', loc:'A', opp:'Union Berlin', round:'1. Spieltag'},
+  {id:'bl2', date:'2025-08-30', type:'BL', loc:'H', opp:'Bor. Mönchengladbach', round:'2. Spieltag'},
+  {id:'bl3', date:'2025-09-13', type:'BL', loc:'A', opp:'SC Freiburg', round:'3. Spieltag'},
+  {id:'bl4', date:'2025-09-19', type:'BL', loc:'H', opp:'FC St. Pauli', round:'4. Spieltag'},
+  {id:'bl5', date:'2025-09-28', type:'BL', loc:'A', opp:'1. FC Köln', round:'5. Spieltag'},
+  {id:'bl6', date:'2025-10-05', type:'BL', loc:'H', opp:'1. FC Heidenheim', round:'6. Spieltag'},
+  {id:'bl7', date:'2025-10-18', type:'BL', loc:'A', opp:'VfL Wolfsburg', round:'7. Spieltag'},
+  {id:'bl8', date:'2025-10-26', type:'BL', loc:'H', opp:'1. FSV Mainz 05', round:'8. Spieltag'},
+  {id:'bl9', date:'2025-11-01', type:'BL', loc:'A', opp:'RB Leipzig', round:'9. Spieltag'},
+  {id:'bl10',date:'2025-11-09', type:'BL', loc:'H', opp:'FC Augsburg', round:'10. Spieltag'},
+  {id:'bl11',date:'2025-11-22', type:'BL', loc:'A', opp:'Borussia Dortmund', round:'11. Spieltag'},
+  {id:'bl12',date:'2025-11-30', type:'BL', loc:'A', opp:'Hamburger SV', round:'12. Spieltag'},
+  {id:'bl13',date:'2025-12-06', type:'BL', loc:'H', opp:'Bayern M&uuml;nchen', round:'13. Spieltag'},
+  {id:'bl14',date:'2025-12-14', type:'BL', loc:'A', opp:'Werder Bremen', round:'14. Spieltag'},
+  {id:'bl15',date:'2025-12-20', type:'BL', loc:'H', opp:'TSG Hoffenheim', round:'15. Spieltag'},
+  {id:'bl16',date:'2026-01-10', type:'BL', loc:'A', opp:'Bayer Leverkusen', round:'16. Spieltag'},
+  {id:'bl17',date:'2026-01-13', type:'BL', loc:'H', opp:'Eintracht Frankfurt', round:'17. Spieltag'},
+  {id:'bl18',date:'2026-01-18', type:'BL', loc:'H', opp:'Union Berlin', round:'18. Spieltag'},
+  {id:'bl19',date:'2026-01-25', type:'BL', loc:'A', opp:'Bor. Mönchengladbach', round:'19. Spieltag'},
+  {id:'bl20',date:'2026-02-01', type:'BL', loc:'H', opp:'SC Freiburg', round:'20. Spieltag'},
+  {id:'bl21',date:'2026-02-07', type:'BL', loc:'A', opp:'FC St. Pauli', round:'21. Spieltag'},
+  {id:'bl22',date:'2026-02-14', type:'BL', loc:'H', opp:'1. FC Köln', round:'22. Spieltag'},
+  {id:'bl23',date:'2026-02-22', type:'BL', loc:'A', opp:'1. FC Heidenheim', round:'23. Spieltag'},
+  {id:'bl24',date:'2026-03-01', type:'BL', loc:'H', opp:'VfL Wolfsburg', round:'24. Spieltag'},
+  {id:'bl25',date:'2026-03-07', type:'BL', loc:'A', opp:'1. FSV Mainz 05', round:'25. Spieltag'},
+  {id:'bl26',date:'2026-03-15', type:'BL', loc:'H', opp:'RB Leipzig', round:'26. Spieltag'},
+  {id:'bl27',date:'2026-03-22', type:'BL', loc:'A', opp:'FC Augsburg', round:'27. Spieltag'},
+  {id:'bl28',date:'2026-04-04', type:'BL', loc:'H', opp:'Borussia Dortmund', round:'28. Spieltag'},
+  {id:'bl29',date:'2026-04-12', type:'BL', loc:'H', opp:'Hamburger SV', round:'29. Spieltag'},
+  {id:'bl30',date:'2026-04-19', type:'BL', loc:'A', opp:'Bayern M&uuml;nchen', round:'30. Spieltag'},
+  {id:'bl31',date:'2026-04-25', type:'BL', loc:'H', opp:'Werder Bremen', round:'31. Spieltag'},
+  {id:'bl32',date:'2026-05-02', type:'BL', loc:'A', opp:'TSG Hoffenheim', round:'32. Spieltag'},
+  {id:'bl33',date:'2026-05-09', type:'BL', loc:'H', opp:'Bayer Leverkusen', round:'33. Spieltag'},
+  {id:'bl34',date:'2026-05-16', type:'BL', loc:'A', opp:'Eintracht Frankfurt', round:'34. Spieltag'},
+  // DFB-Pokal
+  {id:'dfb1', date:'2025-08-26', type:'DFB', loc:'A', opp:'Eintracht Braunschweig', round:'1. Runde'},
+  {id:'dfb2', date:'2025-10-29', type:'DFB', loc:'A', opp:'1. FSV Mainz 05', round:'2. Runde'},
+  {id:'dfb3', date:'2025-12-03', type:'DFB', loc:'A', opp:'VfL Bochum', round:'Achtelfinale'},
+  {id:'dfb4', date:'2026-02-04', type:'DFB', loc:'A', opp:'Holstein Kiel', round:'Viertelfinale'},
+  {id:'dfb5', date:'2026-04-23', type:'DFB', loc:'H', opp:'SC Freiburg', round:'Halbfinale'},
+  // Europa League
+  {id:'el1', date:'2025-09-25', type:'EL', loc:'H', opp:'Celta Vigo', round:'Ligaphase 1'},
+  {id:'el2', date:'2025-10-02', type:'EL', loc:'A', opp:'FC Basel', round:'Ligaphase 2'},
+  {id:'el3', date:'2025-10-23', type:'EL', loc:'A', opp:'Fenerbahce', round:'Ligaphase 3'},
+  {id:'el4', date:'2025-11-06', type:'EL', loc:'H', opp:'Feyenoord Rotterdam', round:'Ligaphase 4'},
+  {id:'el5', date:'2025-11-27', type:'EL', loc:'A', opp:'Go Ahead Eagles', round:'Ligaphase 5'},
+  {id:'el6', date:'2025-12-11', type:'EL', loc:'H', opp:'Maccabi Tel Aviv', round:'Ligaphase 6'},
+  {id:'el7', date:'2026-01-22', type:'EL', loc:'A', opp:'AS Rom', round:'Ligaphase 7'},
+  {id:'el8', date:'2026-01-29', type:'EL', loc:'H', opp:'BSC Young Boys', round:'Ligaphase 8'},
+  {id:'el9', date:'2026-02-19', type:'EL', loc:'A', opp:'Celtic Glasgow', round:'Playoff Hin'},
+  {id:'el10',date:'2026-02-26', type:'EL', loc:'H', opp:'Celtic Glasgow', round:'Playoff Rück'},
+  {id:'el11',date:'2026-03-12', type:'EL', loc:'H', opp:'FC Porto', round:'Achtelfinale Hin'},
+  {id:'el12',date:'2026-03-19', type:'EL', loc:'A', opp:'FC Porto', round:'Achtelfinale Rück'}
+];
+
+// === STATE ===
+const STORAGE_KEY = 'supporters_freudental_v1';
+const SYNC_KEY = 'supporters_freudental_sync_v1';
+const PENDING_KEY = 'supporters_freudental_pending_v1';
+let state = {
+  members: [],         // [{id, name}]
+  attendance: {},      // {matchId: [memberId, memberId, ...]}
+  currentMatchId: null,
+  filter: 'all',
+  statFilter: 'all'
+};
+let syncConfig = {url:'', token:'', userName:'', autoSync:true};
+let pendingOps = [];     // Operationen, die noch nicht in die Cloud geschoben wurden
+let syncStatus = 'idle'; // idle | syncing | ok | error | offline
+let lastSyncAt = null;
+let lastSyncError = '';
+let syncDebounceTimer = null;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state.members = parsed.members || [];
+      state.attendance = parsed.attendance || {};
+    }
+  }catch(e){console.error('Load failed',e)}
+  try{
+    const raw = localStorage.getItem(SYNC_KEY);
+    if(raw) Object.assign(syncConfig, JSON.parse(raw));
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem(PENDING_KEY);
+    if(raw) pendingOps = JSON.parse(raw) || [];
+  }catch(e){}
+  try{
+    const ls = localStorage.getItem('supporters_freudental_lastsync_v1');
+    if(ls) lastSyncAt = new Date(ls);
+  }catch(e){}
+}
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({members:state.members, attendance:state.attendance}));
+  }catch(e){toast('Speichern fehlgeschlagen')}
+}
+function saveSyncConfig(){
+  try{ localStorage.setItem(SYNC_KEY, JSON.stringify(syncConfig)); }catch(e){}
+}
+function savePending(){
+  try{ localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); }catch(e){}
+}
+function queueOp(op){
+  pendingOps.push(op);
+  savePending();
+  if(syncConfig.url && syncConfig.autoSync){
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = setTimeout(()=>ui.sync(true), 600);
+  }
+  ui.updateSyncIndicator();
+}
+
+// === HELPERS ===
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const fmtDate = iso => {
+  const d = new Date(iso);
+  const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  return days[d.getDay()] + ', ' + String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + d.getFullYear();
+};
+const fmtDateShort = iso => {
+  const d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
+};
+const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', SC:'badge-sc'})[t];
+const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', SC:'Supercup'})[t];
+const initials = name => name.split(' ').filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase();
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+// === UI ===
+const ui = {
+  showPage(name){
+    $$('.page').forEach(p=>p.classList.remove('active'));
+    $('#page-'+name).classList.add('active');
+    $$('.tabbar button').forEach(b=>{
+      b.classList.toggle('active', b.dataset.page===name);
+    });
+    if(name==='dashboard') ui.renderDashboard();
+    if(name==='matches') ui.renderMatches();
+    if(name==='members') ui.renderMembers();
+    if(name==='stats') ui.renderStats();
+    window.scrollTo(0,0);
+  },
+  renderDashboard(){
+    $('#stat-members').textContent = state.members.length;
+    const done = Object.values(state.attendance).filter(a=>a.length>0).length;
+    $('#stat-games-done').textContent = done;
+    const totalAtt = Object.values(state.attendance).reduce((s,a)=>s+a.length,0);
+    $('#stat-avg').textContent = done>0 ? (totalAtt/done).toFixed(1) : '0';
+
+    // Upcoming - next 5 matches >= today
+    const today = new Date().toISOString().slice(0,10);
+    const upcoming = SCHEDULE.filter(m=>m.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+    const past = SCHEDULE.filter(m=>m.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+    const list = upcoming.length>0 ? upcoming : past;
+    if(list.length===0){
+      $('#upcoming-list').innerHTML = '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele</div>';
+    } else {
+      $('#upcoming-list').innerHTML = list.map(m=>ui.matchCard(m)).join('') +
+        (upcoming.length===0 ? '<div class="muted" style="text-align:center;margin-top:8px">Saison beendet - letzte Spiele</div>' : '');
+    }
+
+    // Top fans
+    const rank = ui.computeRanking('all');
+    if(rank.length===0){
+      $('#top-fans').innerHTML = '<div class="muted">Noch keine Mitglieder. Lege auf der Mitglieder-Seite welche an.</div>';
+    } else {
+      $('#top-fans').innerHTML = rank.slice(0,3).map((r,i)=>{
+        const medal = ['gold','silver','bronze'][i];
+        return `<div class="rank-row">
+          <div class="rank-pos ${medal}">${i+1}</div>
+          <div class="rank-info">
+            <div class="rank-name">${escapeHtml(r.name)}</div>
+            <div class="rank-detail"><span>&#127968; ${r.h}</span><span>&#9992; ${r.a}</span><span>${r.total} Spiele</span></div>
+          </div>
+          <div class="rank-quota">${r.quota}%</div>
+        </div>`;
+      }).join('');
+    }
+  },
+  renderMatches(){
+    const f = state.filter;
+    let list = SCHEDULE.slice();
+    if(['BL','DFB','EL','SC'].includes(f)) list = list.filter(m=>m.type===f);
+    if(f==='H') list = list.filter(m=>m.loc==='H');
+    if(f==='A') list = list.filter(m=>m.loc==='A');
+    list.sort((a,b)=>a.date.localeCompare(b.date));
+    $('#matches-list').innerHTML = list.map(m=>ui.matchCard(m)).join('');
+  },
+  matchCard(m){
+    const att = (state.attendance[m.id]||[]).length;
+    const matchTitle = m.loc==='H' ? `VfB Stuttgart - ${m.opp}` : `${m.opp} - VfB Stuttgart`;
+    return `<div class="match" onclick="ui.openMatch('${m.id}')">
+      <div class="match-hdr">
+        <div class="match-date">${fmtDateShort(m.date)}</div>
+        <div class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</div>
+        <div class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>
+      </div>
+      <div class="match-teams">${matchTitle}</div>
+      <div class="match-stats">
+        <span>${m.round}</span>
+        <span class="attendance-pill ${att===0?'zero':''}">${att} Fan${att===1?'':'s'} dabei</span>
+      </div>
+    </div>`;
+  },
+  openMatch(id){
+    state.currentMatchId = id;
+    const m = SCHEDULE.find(x=>x.id===id);
+    if(!m) return;
+    const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
+    $('#md-title').innerHTML = matchTitle;
+    $('#md-meta').innerHTML = `${fmtDate(m.date)} &middot; ${typeName(m.type)} &middot; ${m.round} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
+    ui.renderAttendance();
+    ui.showPage('match-detail');
+  },
+  renderAttendance(){
+    const id = state.currentMatchId;
+    const present = state.attendance[id] || [];
+    const total = state.members.length;
+    $('#md-count').textContent = `${present.length} von ${total} anwesend`;
+    if(total===0){
+      $('#attend-list').innerHTML = '<div class="empty"><div class="ic">&#128101;</div>Bitte zuerst Mitglieder auf der Mitglieder-Seite anlegen.</div>';
+      return;
+    }
+    const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    $('#attend-list').innerHTML = sorted.map(m=>{
+      const on = present.includes(m.id);
+      return `<div class="attend-row ${on?'on':''}" onclick="ui.toggleAttendance('${m.id}')">
+        <div class="avatar">${initials(m.name)}</div>
+        <div class="name">${escapeHtml(m.name)}</div>
+        <div class="check">${on?'&#10003;':''}</div>
+      </div>`;
+    }).join('');
+  },
+  toggleAttendance(memberId){
+    const id = state.currentMatchId;
+    if(!state.attendance[id]) state.attendance[id] = [];
+    const arr = state.attendance[id];
+    const idx = arr.indexOf(memberId);
+    if(idx>=0) arr.splice(idx,1); else arr.push(memberId);
+    if(arr.length===0) delete state.attendance[id];
+    saveState();
+    queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
+    ui.renderAttendance();
+  },
+  markAll(on){
+    const id = state.currentMatchId;
+    if(on){
+      state.attendance[id] = state.members.map(m=>m.id);
+    } else {
+      delete state.attendance[id];
+    }
+    saveState();
+    queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
+    ui.renderAttendance();
+    toast(on?'Alle als anwesend markiert':'Alle abgew&auml;hlt');
+  },
+  renderMembers(){
+    if(state.members.length===0){
+      $('#member-list').innerHTML = '<div class="empty"><div class="ic">&#128101;</div>Noch keine Mitglieder.<br>Tippe oben einen Namen ein und auf +</div>';
+      return;
+    }
+    const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    $('#member-list').innerHTML = sorted.map(m=>{
+      const games = Object.values(state.attendance).filter(a=>a.includes(m.id)).length;
+      return `<div class="member">
+        <div class="avatar">${initials(m.name)}</div>
+        <div class="name">${escapeHtml(m.name)}</div>
+        <div class="count">${games} Spiele</div>
+        <button class="del" onclick="ui.removeMember('${m.id}')" title="L&ouml;schen">&times;</button>
+      </div>`;
+    }).join('');
+  },
+  addMember(){
+    const inp = $('#newMemberName');
+    const name = inp.value.trim();
+    if(!name){toast('Bitte Name eingeben');return}
+    if(state.members.some(m=>m.name.toLowerCase()===name.toLowerCase())){
+      toast('Name existiert bereits');return;
+    }
+    const newM = {id:uid(), name};
+    state.members.push(newM);
+    inp.value = '';
+    saveState();
+    queueOp({op:'addMember', id:newM.id, name:newM.name});
+    ui.renderMembers();
+    toast(name + ' hinzugef&uuml;gt');
+  },
+  removeMember(id){
+    const m = state.members.find(x=>x.id===id);
+    if(!m) return;
+    ui.confirm(`"${m.name}" wirklich entfernen?<br><span class="muted">Alle Anwesenheits-Eintr&auml;ge dieser Person werden ebenfalls gel&ouml;scht.</span>`, ()=>{
+      state.members = state.members.filter(x=>x.id!==id);
+      Object.keys(state.attendance).forEach(k=>{
+        state.attendance[k] = state.attendance[k].filter(x=>x!==id);
+        if(state.attendance[k].length===0) delete state.attendance[k];
+      });
+      saveState();
+      queueOp({op:'removeMember', id});
+      ui.renderMembers();
+      toast('Gel&ouml;scht');
+    });
+  },
+  computeRanking(filter){
+    const matches = SCHEDULE.filter(m=>{
+      if(filter==='H') return m.loc==='H';
+      if(filter==='A') return m.loc==='A';
+      if(['BL','DFB','EL','SC'].includes(filter)) return m.type===filter;
+      return true;
+    });
+    const matchIds = matches.map(m=>m.id);
+    const possible = matchIds.length;
+    return state.members.map(mem=>{
+      let h=0, a=0;
+      matchIds.forEach(mid=>{
+        if((state.attendance[mid]||[]).includes(mem.id)){
+          const match = SCHEDULE.find(x=>x.id===mid);
+          if(match.loc==='H') h++; else a++;
+        }
+      });
+      const total = h+a;
+      const quota = possible>0 ? Math.round(total/possible*100) : 0;
+      return {id:mem.id, name:mem.name, h, a, total, quota, possible};
+    }).sort((x,y)=>y.total-x.total || y.quota-x.quota || x.name.localeCompare(y.name,'de'));
+  },
+  renderStats(){
+    const rank = ui.computeRanking(state.statFilter);
+    if(rank.length===0){
+      $('#ranking-list').innerHTML = '<div class="empty"><div class="ic">&#128202;</div>Keine Mitglieder vorhanden.</div>';
+      return;
+    }
+    const possible = rank[0]?.possible || 0;
+    const filterLabel = ({all:'Alle Wettbewerbe', H:'Heimspiele', A:'Ausw&auml;rtsspiele', BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League'})[state.statFilter];
+    $('#ranking-list').innerHTML = `<div class="muted" style="margin-bottom:10px;padding:0 4px">${filterLabel} - ${possible} m&ouml;gliche Spiele</div>` +
+      rank.map((r,i)=>{
+        const medal = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+        return `<div class="rank-row">
+          <div class="rank-pos ${medal}">${i+1}</div>
+          <div class="rank-info">
+            <div class="rank-name">${escapeHtml(r.name)}</div>
+            <div class="rank-detail"><span>&#127968; ${r.h} Heim</span><span>&#9992; ${r.a} Ausw.</span><span>${r.total} gesamt</span></div>
+            <div class="rank-bar"><div class="rank-bar-fill" style="width:${r.quota}%"></div></div>
+          </div>
+          <div class="rank-quota">${r.quota}%</div>
+        </div>`;
+      }).join('');
+  },
+  showSettings(){
+    const total = state.members.length;
+    const totalAtt = Object.values(state.attendance).reduce((s,a)=>s+a.length,0);
+    const syncOn = !!syncConfig.url;
+    const lastSyncTxt = lastSyncAt ? lastSyncAt.toLocaleString('de-DE') : 'noch nie';
+    $('#modal-content').innerHTML = `
+      <h3>Einstellungen &amp; Daten</h3>
+      <div class="status-line"><span>Mitglieder</span><strong>${total}</strong></div>
+      <div class="status-line"><span>Erfasste Spiele</span><strong>${Object.keys(state.attendance).length}</strong></div>
+      <div class="status-line"><span>Anwesenheits-Eintr&auml;ge</span><strong>${totalAtt}</strong></div>
+      <div class="status-line"><span>Cloud-Sync</span><strong style="color:${syncOn?'#1f8a3a':'#999'}">${syncOn?'aktiv':'nicht eingerichtet'}</strong></div>
+      <div class="status-line"><span>Letzter Sync</span><strong>${lastSyncTxt}</strong></div>
+      <div class="status-line"><span>Offene &Auml;nderungen</span><strong>${pendingOps.length}</strong></div>
+      <div style="margin-top:14px"></div>
+      <button class="btn btn-block" onclick="ui.showSyncSettings()">&#9729; Cloud-Sync (Google Sheets) einrichten</button>
+      ${syncOn ? '<button class="btn btn-sec btn-block" onclick="ui.sync(false)">&#128260; Jetzt synchronisieren</button>' : ''}
+      <hr>
+      <button class="btn btn-sec btn-block" onclick="ui.exportData()">&#128190; Lokales Backup exportieren (JSON)</button>
+      <button class="btn btn-sec btn-block" onclick="ui.importData()">&#128229; Backup importieren</button>
+      <button class="btn btn-sec btn-block" onclick="ui.exportCsv()">&#128202; Statistik als CSV exportieren</button>
+      <hr>
+      <button class="btn btn-sec btn-block" style="color:#c33;border-color:#fcc" onclick="ui.clearAll()">Alle lokalen Daten zur&uuml;cksetzen</button>
+      <hr>
+      <div class="muted" style="font-size:11px;text-align:center">
+        Spielplan: kicker.de (Saison 2025/26)<br>
+        Ohne Cloud-Sync werden Daten nur lokal gespeichert.<br>
+        Backup regelm&auml;&szlig;ig per Export sichern!
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-sec" onclick="ui.closeModal()">Schlie&szlig;en</button>
+      </div>`;
+    ui.openModal();
+  },
+  showSyncSettings(){
+    $('#modal-content').innerHTML = `
+      <h3>Cloud-Sync einrichten</h3>
+      <p class="muted" style="font-size:12px">Alle App-Instanzen mit derselben URL und demselben Token greifen auf dasselbe Google Sheet zu. So k&ouml;nnen mehrere Personen parallel erfassen.</p>
+      <div class="form-group">
+        <label>Apps Script Web-App URL</label>
+        <input type="url" id="syncUrl" placeholder="https://script.google.com/macros/s/.../exec" value="${escapeHtml(syncConfig.url||'')}">
+        <div class="hint">Aus der Apps Script Bereitstellung (siehe Anleitung)</div>
+      </div>
+      <div class="form-group">
+        <label>Token (gemeinsames Passwort)</label>
+        <input type="text" id="syncToken" placeholder="Dein selbst gew&auml;hltes Passwort" value="${escapeHtml(syncConfig.token||'')}">
+        <div class="hint">Muss mit dem SECRET_TOKEN im Apps Script &uuml;bereinstimmen</div>
+      </div>
+      <div class="form-group">
+        <label>Dein Name (f&uuml;r Verlauf)</label>
+        <input type="text" id="syncUser" placeholder="z.B. Benjamin" value="${escapeHtml(syncConfig.userName||'')}" maxlength="40">
+        <div class="hint">Wird im Verlaufs-Tab des Sheets protokolliert</div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;color:#222">
+          <input type="checkbox" id="syncAuto" ${syncConfig.autoSync?'checked':''} style="width:auto"> Automatisch nach jeder &Auml;nderung synchronisieren
+        </label>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-sec" onclick="ui.showSettings()">Zur&uuml;ck</button>
+        <button class="btn" onclick="ui.saveSyncSettings()">Speichern &amp; Verbinden</button>
+      </div>
+      ${syncConfig.url ? `<button class="btn btn-sec btn-block" style="margin-top:10px;color:#c33;border-color:#fcc" onclick="ui.disconnectSync()">Verbindung trennen</button>` : ''}
+    `;
+    ui.openModal();
+  },
+  async saveSyncSettings(){
+    const url = $('#syncUrl').value.trim();
+    const token = $('#syncToken').value.trim();
+    const userName = $('#syncUser').value.trim();
+    const autoSync = $('#syncAuto').checked;
+    if(!url || !token){ toast('URL und Token sind Pflichtfelder'); return; }
+    if(!/^https:\/\/script\.google\.com\//.test(url)){
+      toast('URL muss mit https://script.google.com/ beginnen'); return;
+    }
+    const wasNew = !syncConfig.url;
+    syncConfig = {url, token, userName, autoSync};
+    saveSyncConfig();
+    ui.closeModal();
+    toast('Verbinde...');
+    // Beim ersten Verbinden den Nutzer fragen, welche Richtung
+    if(wasNew && (state.members.length>0 || Object.keys(state.attendance).length>0)){
+      // Lokale Daten vorhanden - fragen
+      setTimeout(()=>ui.showInitialSyncChoice(), 200);
+    } else {
+      await ui.sync(false);
+    }
+  },
+  showInitialSyncChoice(){
+    $('#modal-content').innerHTML = `
+      <h3>Erstmaliger Sync</h3>
+      <p>Du hast bereits lokale Daten und verbindest dich mit der Cloud. Was soll passieren?</p>
+      <button class="btn btn-block" onclick="ui.initialSync('push')">&#9650; Lokale Daten in Cloud hochladen</button>
+      <div class="muted" style="font-size:11px;margin-bottom:14px">Verwende dies, wenn ihr neu startet und du der erste bist.</div>
+      <button class="btn btn-sec btn-block" onclick="ui.initialSync('pull')">&#9660; Cloud-Daten herunterladen (lokal &uuml;berschreiben)</button>
+      <div class="muted" style="font-size:11px;margin-bottom:14px">Verwende dies, wenn jemand anders bereits Daten hochgeladen hat.</div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-sec" onclick="ui.closeModal()">Sp&auml;ter entscheiden</button>
+      </div>`;
+    ui.openModal();
+  },
+  async initialSync(direction){
+    ui.closeModal();
+    if(direction==='push'){
+      // Alle lokalen Daten als Operationen queuen
+      pendingOps = [];
+      state.members.forEach(m=>pendingOps.push({op:'addMember', id:m.id, name:m.name}));
+      Object.keys(state.attendance).forEach(matchId=>{
+        pendingOps.push({op:'setAttendance', matchId, memberIds:state.attendance[matchId]});
+      });
+      savePending();
+      await ui.sync(false);
+    } else {
+      // Nur Pull - lokale Daten verwerfen
+      pendingOps = [];
+      savePending();
+      await ui.sync(false);
+    }
+  },
+  disconnectSync(){
+    ui.confirm('Cloud-Sync wirklich trennen?<br><span class="muted">Lokale Daten bleiben erhalten. Du kannst dich sp&auml;ter wieder verbinden.</span>', ()=>{
+      syncConfig = {url:'', token:'', userName:syncConfig.userName, autoSync:true};
+      pendingOps = [];
+      saveSyncConfig();
+      savePending();
+      lastSyncAt = null;
+      try{ localStorage.removeItem('supporters_freudental_lastsync_v1'); }catch(e){}
+      syncStatus = 'idle';
+      ui.updateSyncIndicator();
+      ui.closeModal();
+      toast('Sync getrennt');
+    });
+  },
+  async sync(silent){
+    if(!syncConfig.url){
+      if(!silent){
+        ui.closeModal();
+        ui.showSyncSettings();
+      }
+      return;
+    }
+    if(syncStatus==='syncing') return;
+    syncStatus = 'syncing';
+    ui.updateSyncIndicator();
+    try{
+      let response;
+      const ops = pendingOps.slice();
+      if(ops.length>0){
+        response = await fetch(syncConfig.url, {
+          method:'POST',
+          body:JSON.stringify({token:syncConfig.token, userName:syncConfig.userName||'unbekannt', operations:ops}),
+          headers:{'Content-Type':'text/plain;charset=utf-8'},
+          redirect:'follow'
+        });
+      } else {
+        response = await fetch(syncConfig.url + (syncConfig.url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(syncConfig.token), {redirect:'follow'});
+      }
+      if(!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      if(!data.ok) throw new Error(data.error || 'Unbekannter Fehler');
+      // Server-State &uuml;bernehmen
+      state.members = data.data.members || [];
+      state.attendance = data.data.attendance || {};
+      pendingOps = [];
+      saveState();
+      savePending();
+      lastSyncAt = new Date();
+      try{ localStorage.setItem('supporters_freudental_lastsync_v1', lastSyncAt.toISOString()); }catch(e){}
+      syncStatus = 'ok';
+      lastSyncError = '';
+      if(!silent) toast('Synchronisiert &#10003;');
+      // Aktive Seite neu rendern
+      const active = document.querySelector('.page.active');
+      if(active){
+        const name = active.id.replace('page-','');
+        if(name==='match-detail') ui.renderAttendance(); else ui.showPage(name);
+      }
+    }catch(err){
+      syncStatus = 'error';
+      lastSyncError = err.message || String(err);
+      if(!silent) toast('Sync-Fehler: ' + lastSyncError);
+      console.error('Sync error', err);
+    }finally{
+      ui.updateSyncIndicator();
+    }
+  },
+  updateSyncIndicator(){
+    const pill = $('#syncPill');
+    const txt = $('#syncText');
+    if(!syncConfig.url){
+      pill.className = 'sync-pill';
+      txt.textContent = 'Nicht verbunden';
+      return;
+    }
+    pill.className = 'sync-pill ' + (syncStatus==='ok'?'ok':syncStatus==='syncing'?'syncing':syncStatus==='error'?'error':'offline');
+    const pendCnt = pendingOps.length;
+    if(syncStatus==='syncing') txt.textContent = 'Synchronisiere...';
+    else if(syncStatus==='error') txt.textContent = 'Fehler - tippen';
+    else if(pendCnt>0) txt.textContent = pendCnt + ' offen - tippen';
+    else if(lastSyncAt){
+      const diff = Math.round((Date.now()-lastSyncAt.getTime())/60000);
+      if(diff<1) txt.textContent = 'Synchron';
+      else if(diff<60) txt.textContent = 'Sync vor ' + diff + ' Min';
+      else txt.textContent = 'Sync vor ' + Math.round(diff/60) + ' Std';
+    }
+    else txt.textContent = 'Verbunden';
+  },
+  exportData(){
+    const data = JSON.stringify({version:1, exportedAt:new Date().toISOString(), members:state.members, attendance:state.attendance}, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'supporters-freudental-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Export heruntergeladen');
+  },
+  importData(){
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = '.json,application/json';
+    inp.onchange = e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev=>{
+        try{
+          const data = JSON.parse(ev.target.result);
+          if(!data.members || !data.attendance) throw new Error('invalid');
+          ui.confirm('Aktuelle Daten werden &uuml;berschrieben. Fortfahren?', ()=>{
+            state.members = data.members;
+            state.attendance = data.attendance;
+            saveState();
+            ui.closeModal();
+            ui.showPage('dashboard');
+            toast('Import erfolgreich');
+          });
+        }catch(err){toast('Datei ung&uuml;ltig')}
+      };
+      reader.readAsText(file);
+    };
+    inp.click();
+  },
+  exportCsv(){
+    const rank = ui.computeRanking('all');
+    const rankH = ui.computeRanking('H');
+    const rankA = ui.computeRanking('A');
+    const hMap = {}, aMap = {};
+    rankH.forEach(r=>hMap[r.id]=r);
+    rankA.forEach(r=>aMap[r.id]=r);
+    const lines = ['Name;Heimspiele;Auswärtsspiele;Gesamt;Quote in %'];
+    rank.forEach(r=>{
+      lines.push([r.name, hMap[r.id]?.total||0, aMap[r.id]?.total||0, r.total, r.quota].join(';'));
+    });
+    const blob = new Blob(['﻿' + lines.join('\n')], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'supporters-statistik-' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('CSV heruntergeladen');
+  },
+  clearAll(){
+    ui.confirm('<strong>Wirklich alle Daten l&ouml;schen?</strong><br>Mitglieder und alle Anwesenheits-Eintr&auml;ge gehen verloren.<br><br>Tipp: Vorher Export machen!', ()=>{
+      state.members = [];
+      state.attendance = {};
+      saveState();
+      ui.closeModal();
+      ui.showPage('dashboard');
+      toast('Alle Daten gel&ouml;scht');
+    });
+  },
+  confirm(html, onYes){
+    $('#modal-content').innerHTML = `
+      <h3>Best&auml;tigen</h3>
+      <p>${html}</p>
+      <div class="row">
+        <button class="btn btn-sec" onclick="ui.closeModal()">Abbrechen</button>
+        <button class="btn" id="modalConfirmBtn">OK</button>
+      </div>`;
+    $('#modalConfirmBtn').onclick = ()=>{ui.closeModal(); onYes();};
+    ui.openModal();
+  },
+  openModal(){$('#modal-overlay').classList.add('show')},
+  closeModal(){$('#modal-overlay').classList.remove('show')},
+  installApp(){
+    if(window._deferredPrompt){
+      window._deferredPrompt.prompt();
+      window._deferredPrompt = null;
+      $('#installBanner').classList.remove('show');
+    } else {
+      ui.confirm('Auf Android: Browser-Men&uuml; (drei Punkte) &rarr; "Zum Startbildschirm hinzuf&uuml;gen".<br><br>Auf iOS: Teilen-Symbol &rarr; "Zum Home-Bildschirm".', ()=>{});
+    }
+  }
+};
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c])}
+
+// === EVENTS ===
+$$('.tabbar button').forEach(b=>b.addEventListener('click',()=>ui.showPage(b.dataset.page)));
+$$('#filter-chips .chip').forEach(c=>c.addEventListener('click',()=>{
+  $$('#filter-chips .chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');
+  state.filter = c.dataset.f;
+  ui.renderMatches();
+}));
+$$('#page-stats .chip').forEach(c=>c.addEventListener('click',()=>{
+  $$('#page-stats .chip').forEach(x=>x.classList.remove('active'));
+  c.classList.add('active');
+  state.statFilter = c.dataset.stat;
+  ui.renderStats();
+}));
+$('#newMemberName').addEventListener('keydown',e=>{if(e.key==='Enter')ui.addMember()});
+$('#modal-overlay').addEventListener('click',e=>{if(e.target.id==='modal-overlay')ui.closeModal()});
+
+// PWA-Installation: Android (beforeinstallprompt) + iOS (manueller Hinweis)
+window.addEventListener('beforeinstallprompt', e=>{
+  e.preventDefault();
+  window._deferredPrompt = e;
+  if(!isStandalone()) $('#installBanner').classList.add('show');
+});
+
+// iOS-Erkennung
+function isIOS(){return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream}
+function isStandalone(){
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+// Auf iOS: Install-Banner nach kurzer Verzögerung anzeigen, wenn nicht installiert
+if(isIOS() && !isStandalone() && !localStorage.getItem('install_dismissed')){
+  setTimeout(()=>{
+    const b = $('#installBanner');
+    b.classList.add('show');
+    const labelSpan = b.querySelector('span:nth-of-type(2)');
+    if(labelSpan) labelSpan.textContent = 'Tippe unten auf Teilen und "Zum Home-Bildschirm" für Vollbild-Modus';
+    const btn = b.querySelector('button');
+    if(btn){
+      btn.textContent = 'OK';
+      btn.onclick = ()=>{localStorage.setItem('install_dismissed','1'); b.classList.remove('show')};
+    }
+  }, 2000);
+}
+
+// Service Worker registrieren für Offline-Support
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=>console.log('SW-Fehler:', err));
+  });
+}
+
+// In Standalone-Modus: externe Links im Browser öffnen (sonst springt iOS aus der App)
+document.addEventListener('click', e=>{
+  if(!isStandalone()) return;
+  const a = e.target.closest('a');
+  if(a && a.href && a.target !== '_self' && !a.href.startsWith(location.origin)){
+    e.preventDefault();
+    window.open(a.href, '_blank');
+  }
+});
+
+// === INIT ===
+loadState();
+ui.showPage('dashboard');
+ui.updateSyncIndicator();
+// Beim Start automatisch synchronisieren, falls eingerichtet
+if(syncConfig.url){
+  setTimeout(()=>ui.sync(true), 800);
+}
+// Online/Offline-Erkennung
+window.addEventListener('online', ()=>{ if(syncConfig.url) ui.sync(true); });
+window.addEventListener('offline', ()=>{
+  if(syncConfig.url){ syncStatus='offline'; ui.updateSyncIndicator(); }
+});
+// Beim Wiederfokussieren der App synchronisieren
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && syncConfig.url){
+    if(!lastSyncAt || (Date.now()-lastSyncAt.getTime())>30000){
+      ui.sync(true);
+    }
+  }
+});
+</script>
+</body>
+</html>
