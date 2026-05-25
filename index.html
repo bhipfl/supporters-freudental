@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#E32219" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#9e1610" media="(prefers-color-scheme: dark)">
-<meta name="description" content="VfB Stuttgart Fanclub Supporters Freudental - Anwesenheitserfassung Saison 2025/26">
+<meta name="description" content="VfB Stuttgart Fanclub Supporters Freudental - Anwesenheitserfassung">
 <meta name="format-detection" content="telephone=no">
 
 <!-- PWA Manifest -->
@@ -65,6 +65,7 @@ header .head-actions button{background:rgba(255,255,255,.18);border:0;color:#fff
 .badge-bl{background:#fde8e6;color:#E32219}
 .badge-dfb{background:#e8f4fd;color:#1972c4}
 .badge-el{background:#fff3e0;color:#e67e00}
+.badge-cl{background:#e6f0fb;color:#0c3a85}
 .badge-sc{background:#f0e8fd;color:#7b3fbf}
 .match-loc{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px}
 .match-loc.h{background:#e7f6ec;color:#1f8a3a}
@@ -140,6 +141,14 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .status-line{display:flex;justify-content:space-between;font-size:12px;color:#666;padding:6px 0;border-bottom:1px solid #f0f1f4}
 .status-line:last-child{border-bottom:0}
 .status-line strong{color:#222}
+.season-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.season-bar label{font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.season-bar select{flex:1;padding:9px 12px;border:1px solid #d8dae0;border-radius:10px;font-size:14px;font-weight:600;background:#fff;font-family:inherit;color:#222;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23666' d='M6 8 0 0h12z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.season-bar select:focus{outline:0;border-color:#E32219}
+.season-empty{background:#fff8e0;border:1px solid #f1d976;color:#7a5500;padding:18px 14px;border-radius:12px;text-align:center;margin-bottom:12px}
+.season-empty .ic{font-size:32px;margin-bottom:6px;opacity:.7}
+.season-empty .ttl{font-weight:700;font-size:14px;margin-bottom:4px;color:#5a4000}
+.season-empty .desc{font-size:12px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -147,7 +156,7 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
   <header>
     <img src="apple-touch-icon-120.png" class="logo" alt="Supporters Freudental">
     <h1>Supporters Freudental</h1>
-    <div class="sub">Saison 2025/26</div>
+    <div class="sub" id="header-season">Saison &mdash;</div>
     <div class="sync-pill" id="syncPill" onclick="ui.sync(false)">
       <span class="dot"></span><span id="syncText">Nicht verbunden</span>
     </div>
@@ -182,15 +191,11 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 
   <!-- Spiele -->
   <div class="page" id="page-matches">
-    <div class="filter-chips" id="filter-chips">
-      <button class="chip active" data-f="all">Alle</button>
-      <button class="chip" data-f="BL">Bundesliga</button>
-      <button class="chip" data-f="DFB">DFB-Pokal</button>
-      <button class="chip" data-f="EL">Europa League</button>
-      <button class="chip" data-f="SC">Supercup</button>
-      <button class="chip" data-f="H">Nur Heim</button>
-      <button class="chip" data-f="A">Nur Ausw&auml;rts</button>
+    <div class="season-bar">
+      <label for="seasonSelect">Saison</label>
+      <select id="seasonSelect"></select>
     </div>
+    <div class="filter-chips" id="filter-chips"></div>
     <div id="matches-list"></div>
   </div>
 
@@ -205,14 +210,11 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 
   <!-- Statistik -->
   <div class="page" id="page-stats">
-    <div class="filter-chips">
-      <button class="chip active" data-stat="all">Gesamt</button>
-      <button class="chip" data-stat="H">Heim</button>
-      <button class="chip" data-stat="A">Ausw&auml;rts</button>
-      <button class="chip" data-stat="BL">Bundesliga</button>
-      <button class="chip" data-stat="DFB">Pokal</button>
-      <button class="chip" data-stat="EL">Europa</button>
+    <div class="season-bar">
+      <label for="seasonSelectStats">Saison</label>
+      <select id="seasonSelectStats"></select>
     </div>
+    <div class="filter-chips" id="stat-chips"></div>
     <div id="ranking-list"></div>
   </div>
 
@@ -252,76 +254,26 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 
 <script>
 // === DATEN ===
-// Spielplan VfB Stuttgart 2025/26 (Quelle: kicker.de)
-// type: BL=Bundesliga, DFB=DFB-Pokal, EL=Europa League, SC=Supercup
-// loc: H=Heim, A=Auswaerts
-const SCHEDULE = [
-  // Supercup
-  {id:'sc1', date:'2025-08-16', type:'SC', loc:'H', opp:'Bayern M&uuml;nchen', round:'Supercup Finale'},
-  // Bundesliga
-  {id:'bl1', date:'2025-08-23', type:'BL', loc:'A', opp:'Union Berlin', round:'1. Spieltag'},
-  {id:'bl2', date:'2025-08-30', type:'BL', loc:'H', opp:'Bor. Mönchengladbach', round:'2. Spieltag'},
-  {id:'bl3', date:'2025-09-13', type:'BL', loc:'A', opp:'SC Freiburg', round:'3. Spieltag'},
-  {id:'bl4', date:'2025-09-19', type:'BL', loc:'H', opp:'FC St. Pauli', round:'4. Spieltag'},
-  {id:'bl5', date:'2025-09-28', type:'BL', loc:'A', opp:'1. FC Köln', round:'5. Spieltag'},
-  {id:'bl6', date:'2025-10-05', type:'BL', loc:'H', opp:'1. FC Heidenheim', round:'6. Spieltag'},
-  {id:'bl7', date:'2025-10-18', type:'BL', loc:'A', opp:'VfL Wolfsburg', round:'7. Spieltag'},
-  {id:'bl8', date:'2025-10-26', type:'BL', loc:'H', opp:'1. FSV Mainz 05', round:'8. Spieltag'},
-  {id:'bl9', date:'2025-11-01', type:'BL', loc:'A', opp:'RB Leipzig', round:'9. Spieltag'},
-  {id:'bl10',date:'2025-11-09', type:'BL', loc:'H', opp:'FC Augsburg', round:'10. Spieltag'},
-  {id:'bl11',date:'2025-11-22', type:'BL', loc:'A', opp:'Borussia Dortmund', round:'11. Spieltag'},
-  {id:'bl12',date:'2025-11-30', type:'BL', loc:'A', opp:'Hamburger SV', round:'12. Spieltag'},
-  {id:'bl13',date:'2025-12-06', type:'BL', loc:'H', opp:'Bayern M&uuml;nchen', round:'13. Spieltag'},
-  {id:'bl14',date:'2025-12-14', type:'BL', loc:'A', opp:'Werder Bremen', round:'14. Spieltag'},
-  {id:'bl15',date:'2025-12-20', type:'BL', loc:'H', opp:'TSG Hoffenheim', round:'15. Spieltag'},
-  {id:'bl16',date:'2026-01-10', type:'BL', loc:'A', opp:'Bayer Leverkusen', round:'16. Spieltag'},
-  {id:'bl17',date:'2026-01-13', type:'BL', loc:'H', opp:'Eintracht Frankfurt', round:'17. Spieltag'},
-  {id:'bl18',date:'2026-01-18', type:'BL', loc:'H', opp:'Union Berlin', round:'18. Spieltag'},
-  {id:'bl19',date:'2026-01-25', type:'BL', loc:'A', opp:'Bor. Mönchengladbach', round:'19. Spieltag'},
-  {id:'bl20',date:'2026-02-01', type:'BL', loc:'H', opp:'SC Freiburg', round:'20. Spieltag'},
-  {id:'bl21',date:'2026-02-07', type:'BL', loc:'A', opp:'FC St. Pauli', round:'21. Spieltag'},
-  {id:'bl22',date:'2026-02-14', type:'BL', loc:'H', opp:'1. FC Köln', round:'22. Spieltag'},
-  {id:'bl23',date:'2026-02-22', type:'BL', loc:'A', opp:'1. FC Heidenheim', round:'23. Spieltag'},
-  {id:'bl24',date:'2026-03-01', type:'BL', loc:'H', opp:'VfL Wolfsburg', round:'24. Spieltag'},
-  {id:'bl25',date:'2026-03-07', type:'BL', loc:'A', opp:'1. FSV Mainz 05', round:'25. Spieltag'},
-  {id:'bl26',date:'2026-03-15', type:'BL', loc:'H', opp:'RB Leipzig', round:'26. Spieltag'},
-  {id:'bl27',date:'2026-03-22', type:'BL', loc:'A', opp:'FC Augsburg', round:'27. Spieltag'},
-  {id:'bl28',date:'2026-04-04', type:'BL', loc:'H', opp:'Borussia Dortmund', round:'28. Spieltag'},
-  {id:'bl29',date:'2026-04-12', type:'BL', loc:'H', opp:'Hamburger SV', round:'29. Spieltag'},
-  {id:'bl30',date:'2026-04-19', type:'BL', loc:'A', opp:'Bayern M&uuml;nchen', round:'30. Spieltag'},
-  {id:'bl31',date:'2026-04-25', type:'BL', loc:'H', opp:'Werder Bremen', round:'31. Spieltag'},
-  {id:'bl32',date:'2026-05-02', type:'BL', loc:'A', opp:'TSG Hoffenheim', round:'32. Spieltag'},
-  {id:'bl33',date:'2026-05-09', type:'BL', loc:'H', opp:'Bayer Leverkusen', round:'33. Spieltag'},
-  {id:'bl34',date:'2026-05-16', type:'BL', loc:'A', opp:'Eintracht Frankfurt', round:'34. Spieltag'},
-  // DFB-Pokal
-  {id:'dfb1', date:'2025-08-26', type:'DFB', loc:'A', opp:'Eintracht Braunschweig', round:'1. Runde'},
-  {id:'dfb2', date:'2025-10-29', type:'DFB', loc:'A', opp:'1. FSV Mainz 05', round:'2. Runde'},
-  {id:'dfb3', date:'2025-12-03', type:'DFB', loc:'A', opp:'VfL Bochum', round:'Achtelfinale'},
-  {id:'dfb4', date:'2026-02-04', type:'DFB', loc:'A', opp:'Holstein Kiel', round:'Viertelfinale'},
-  {id:'dfb5', date:'2026-04-23', type:'DFB', loc:'H', opp:'SC Freiburg', round:'Halbfinale'},
-  // Europa League
-  {id:'el1', date:'2025-09-25', type:'EL', loc:'H', opp:'Celta Vigo', round:'Ligaphase 1'},
-  {id:'el2', date:'2025-10-02', type:'EL', loc:'A', opp:'FC Basel', round:'Ligaphase 2'},
-  {id:'el3', date:'2025-10-23', type:'EL', loc:'A', opp:'Fenerbahce', round:'Ligaphase 3'},
-  {id:'el4', date:'2025-11-06', type:'EL', loc:'H', opp:'Feyenoord Rotterdam', round:'Ligaphase 4'},
-  {id:'el5', date:'2025-11-27', type:'EL', loc:'A', opp:'Go Ahead Eagles', round:'Ligaphase 5'},
-  {id:'el6', date:'2025-12-11', type:'EL', loc:'H', opp:'Maccabi Tel Aviv', round:'Ligaphase 6'},
-  {id:'el7', date:'2026-01-22', type:'EL', loc:'A', opp:'AS Rom', round:'Ligaphase 7'},
-  {id:'el8', date:'2026-01-29', type:'EL', loc:'H', opp:'BSC Young Boys', round:'Ligaphase 8'},
-  {id:'el9', date:'2026-02-19', type:'EL', loc:'A', opp:'Celtic Glasgow', round:'Playoff Hin'},
-  {id:'el10',date:'2026-02-26', type:'EL', loc:'H', opp:'Celtic Glasgow', round:'Playoff Rück'},
-  {id:'el11',date:'2026-03-12', type:'EL', loc:'H', opp:'FC Porto', round:'Achtelfinale Hin'},
-  {id:'el12',date:'2026-03-19', type:'EL', loc:'A', opp:'FC Porto', round:'Achtelfinale Rück'}
-];
+// Spielpläne liegen in fixtures/*.json und werden zur Laufzeit geladen.
+// type-Codes: BL=Bundesliga, DFB=DFB-Pokal, EL=Europa League, CL=Champions League, SC=Supercup
+// loc: H=Heim, A=Auswärts
+// match-IDs werden beim Laden mit dem Saison-Prefix kombiniert: "2526-bl1" usw.
+let SEASONS = [];          // [{id, label, file, current}]
+let SCHEDULES = {};        // {seasonId: [matchObjekte mit prefixed IDs]}
+let SCHEDULE = [];         // Spiele der aktuell gewählten Saison (für Render-Logik)
+const FALLBACK_SEASON_ID = '2526';
 
 // === STATE ===
 const STORAGE_KEY = 'supporters_freudental_v1';
 const SYNC_KEY = 'supporters_freudental_sync_v1';
 const PENDING_KEY = 'supporters_freudental_pending_v1';
+const SEASON_KEY = 'supporters_freudental_season_v1';
+const MIGRATION_KEY = 'supporters_freudental_migrated_v2';
 let state = {
   members: [],         // [{id, name}]
-  attendance: {},      // {matchId: [memberId, memberId, ...]}
+  attendance: {},      // {matchId: [memberId, memberId, ...]}  matchId hat Saison-Prefix
   currentMatchId: null,
+  seasonId: FALLBACK_SEASON_ID,
   filter: 'all',
   statFilter: 'all'
 };
@@ -353,6 +305,98 @@ function loadState(){
     const ls = localStorage.getItem('supporters_freudental_lastsync_v1');
     if(ls) lastSyncAt = new Date(ls);
   }catch(e){}
+  try{
+    const s = localStorage.getItem(SEASON_KEY);
+    if(s) state.seasonId = s;
+  }catch(e){}
+  migrateAttendanceIds();
+}
+
+// Idempotente Migration: Attendance-Keys ohne Saison-Prefix bekommen
+// '2526-' vorangestellt (alle Alt-Daten stammen aus Saison 2025/26).
+// Wird beim Start und nach jedem Cloud-Pull aufgerufen. Konflikte werden
+// per Set-Union gemerged, sodass keine Daten verloren gehen.
+function migrateAttendanceIds(){
+  try{
+    const renamed = [];
+    Object.keys(state.attendance).slice().forEach(key=>{
+      if(key.includes('-')) return;
+      const newKey = FALLBACK_SEASON_ID + '-' + key;
+      const oldList = state.attendance[key] || [];
+      if(state.attendance[newKey]){
+        state.attendance[newKey] = Array.from(new Set([...(state.attendance[newKey]||[]), ...oldList]));
+      } else {
+        state.attendance[newKey] = oldList;
+      }
+      delete state.attendance[key];
+      renamed.push(newKey);
+    });
+    if(renamed.length>0){
+      saveState();
+      renamed.forEach(k=>{
+        pendingOps.push({op:'setAttendance', matchId:k, memberIds:state.attendance[k]});
+      });
+      savePending();
+    }
+    localStorage.setItem(MIGRATION_KEY, '1');
+  }catch(e){console.error('Migration failed', e)}
+}
+
+function saveSeasonChoice(){
+  try{ localStorage.setItem(SEASON_KEY, state.seasonId); }catch(e){}
+}
+
+// Lädt fixtures/index.json + alle dort referenzierten Spielpläne.
+// Match-IDs werden mit Saison-Prefix versehen (bl1 → 2526-bl1).
+async function loadFixtures(){
+  try{
+    const idxResp = await fetch('fixtures/index.json', {cache:'no-cache'});
+    if(!idxResp.ok) throw new Error('Index-Datei nicht erreichbar');
+    const idx = await idxResp.json();
+    SEASONS = idx.seasons || [];
+    SCHEDULES = {};
+    await Promise.all(SEASONS.map(async s=>{
+      try{
+        const r = await fetch(s.file, {cache:'no-cache'});
+        if(!r.ok){ SCHEDULES[s.id] = []; return; }
+        const data = await r.json();
+        const prefix = s.id + '-';
+        SCHEDULES[s.id] = (data.matches||[]).map(m=>Object.assign({}, m, {id: prefix + m.id}));
+      }catch(err){
+        console.warn('Spielplan ' + s.id + ' konnte nicht geladen werden', err);
+        SCHEDULES[s.id] = [];
+      }
+    }));
+    // Gewählte Saison auf gültigen Wert sicherstellen
+    if(!SEASONS.some(s=>s.id===state.seasonId)){
+      const cur = SEASONS.find(s=>s.current) || SEASONS[0];
+      if(cur) state.seasonId = cur.id;
+    }
+    SCHEDULE = SCHEDULES[state.seasonId] || [];
+  }catch(err){
+    console.error('Fixtures konnten nicht geladen werden', err);
+    SEASONS = [];
+    SCHEDULES = {};
+    SCHEDULE = [];
+  }
+}
+
+function setSeason(seasonId){
+  if(!SCHEDULES[seasonId]) return;
+  state.seasonId = seasonId;
+  SCHEDULE = SCHEDULES[seasonId];
+  saveSeasonChoice();
+  // Beide Selects synchron halten, falls die Änderung programmatisch erfolgte
+  const s1 = document.getElementById('seasonSelect');
+  const s2 = document.getElementById('seasonSelectStats');
+  if(s1 && s1.value !== seasonId) s1.value = seasonId;
+  if(s2 && s2.value !== seasonId) s2.value = seasonId;
+  ui.renderHeaderSeason();
+  ui.renderFilterChips();
+  ui.renderStatChips();
+  ui.renderMatches();
+  ui.renderDashboard();
+  ui.renderStats();
 }
 function saveState(){
   try{
@@ -387,8 +431,10 @@ const fmtDateShort = iso => {
   const d = new Date(iso);
   return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
 };
-const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', SC:'badge-sc'})[t];
-const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', SC:'Supercup'})[t];
+const COMP_TYPES = ['BL','DFB','EL','CL','SC'];
+const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', CL:'badge-cl', SC:'badge-sc'})[t] || 'badge-bl';
+const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup'})[t] || t;
+const typeShort = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa', CL:'Champions', SC:'Supercup'})[t] || t;
 const initials = name => name.split(' ').filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 function toast(msg){
@@ -408,28 +454,77 @@ const ui = {
       b.classList.toggle('active', b.dataset.page===name);
     });
     if(name==='dashboard') ui.renderDashboard();
-    if(name==='matches') ui.renderMatches();
+    if(name==='matches'){ ui.renderFilterChips(); ui.renderMatches(); }
     if(name==='members') ui.renderMembers();
-    if(name==='stats') ui.renderStats();
+    if(name==='stats'){ ui.renderStatChips(); ui.renderStats(); }
     window.scrollTo(0,0);
+  },
+  renderHeaderSeason(){
+    const s = SEASONS.find(x=>x.id===state.seasonId);
+    $('#header-season').textContent = s ? s.label : 'Saison —';
+  },
+  renderSeasonSelects(){
+    const opts = SEASONS.map(s=>`<option value="${s.id}" ${s.id===state.seasonId?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
+    const sel1 = $('#seasonSelect');
+    const sel2 = $('#seasonSelectStats');
+    if(sel1) sel1.innerHTML = opts;
+    if(sel2) sel2.innerHTML = opts;
+  },
+  renderFilterChips(){
+    const types = COMP_TYPES.filter(t=>SCHEDULE.some(m=>m.type===t));
+    const chips = [
+      '<button class="chip ' + (state.filter==='all'?'active':'') + '" data-f="all">Alle</button>',
+      ...types.map(t=>`<button class="chip ${state.filter===t?'active':''}" data-f="${t}">${typeName(t)}</button>`),
+      '<button class="chip ' + (state.filter==='H'?'active':'') + '" data-f="H">Nur Heim</button>',
+      '<button class="chip ' + (state.filter==='A'?'active':'') + '" data-f="A">Nur Ausw&auml;rts</button>'
+    ];
+    const wrap = $('#filter-chips');
+    wrap.innerHTML = chips.join('');
+    wrap.querySelectorAll('.chip').forEach(c=>c.addEventListener('click', ()=>{
+      state.filter = c.dataset.f;
+      ui.renderFilterChips();
+      ui.renderMatches();
+    }));
+  },
+  renderStatChips(){
+    const types = COMP_TYPES.filter(t=>SCHEDULE.some(m=>m.type===t));
+    const chips = [
+      '<button class="chip ' + (state.statFilter==='all'?'active':'') + '" data-stat="all">Gesamt</button>',
+      '<button class="chip ' + (state.statFilter==='H'?'active':'') + '" data-stat="H">Heim</button>',
+      '<button class="chip ' + (state.statFilter==='A'?'active':'') + '" data-stat="A">Ausw&auml;rts</button>',
+      ...types.map(t=>`<button class="chip ${state.statFilter===t?'active':''}" data-stat="${t}">${typeShort(t)}</button>`)
+    ];
+    const wrap = $('#stat-chips');
+    wrap.innerHTML = chips.join('');
+    wrap.querySelectorAll('.chip').forEach(c=>c.addEventListener('click', ()=>{
+      state.statFilter = c.dataset.stat;
+      ui.renderStatChips();
+      ui.renderStats();
+    }));
   },
   renderDashboard(){
     $('#stat-members').textContent = state.members.length;
-    const done = Object.values(state.attendance).filter(a=>a.length>0).length;
+    // Stat-Werte beziehen sich auf die aktuell gewählte Saison
+    const matchIds = SCHEDULE.map(m=>m.id);
+    const done = matchIds.filter(id=>(state.attendance[id]||[]).length>0).length;
     $('#stat-games-done').textContent = done;
-    const totalAtt = Object.values(state.attendance).reduce((s,a)=>s+a.length,0);
+    const totalAtt = matchIds.reduce((s,id)=>s + (state.attendance[id]||[]).length, 0);
     $('#stat-avg').textContent = done>0 ? (totalAtt/done).toFixed(1) : '0';
 
     // Upcoming - next 5 matches >= today
-    const today = new Date().toISOString().slice(0,10);
-    const upcoming = SCHEDULE.filter(m=>m.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
-    const past = SCHEDULE.filter(m=>m.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
-    const list = upcoming.length>0 ? upcoming : past;
-    if(list.length===0){
-      $('#upcoming-list').innerHTML = '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele</div>';
+    if(SCHEDULE.length===0){
+      $('#upcoming-list').innerHTML = ui.seasonEmptyHtml();
     } else {
-      $('#upcoming-list').innerHTML = list.map(m=>ui.matchCard(m)).join('') +
-        (upcoming.length===0 ? '<div class="muted" style="text-align:center;margin-top:8px">Saison beendet - letzte Spiele</div>' : '');
+      const today = new Date().toISOString().slice(0,10);
+      const upcoming = SCHEDULE.filter(m=>m.date>=today).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5);
+      const past = SCHEDULE.filter(m=>m.date<today).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,3);
+      const list = upcoming.length>0 ? upcoming : past;
+      if(list.length===0){
+        $('#upcoming-list').innerHTML = '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele</div>';
+      } else {
+        $('#upcoming-list').innerHTML = list.map(m=>ui.matchCard(m)).join('') +
+          (upcoming.length===0 ? '<div class="muted" style="text-align:center;margin-top:8px">Saison beendet - letzte Spiele</div>' : '');
+      }
     }
 
     // Top fans
@@ -450,14 +545,27 @@ const ui = {
       }).join('');
     }
   },
+  seasonEmptyHtml(){
+    return `<div class="season-empty">
+      <div class="ic">&#128197;</div>
+      <div class="ttl">Spielplan noch nicht verf&uuml;gbar</div>
+      <div class="desc">Der Spielplan dieser Saison wird vor Saisonbeginn erg&auml;nzt. Sobald die Daten ver&ouml;ffentlicht sind, erscheinen die Spiele hier automatisch.</div>
+    </div>`;
+  },
   renderMatches(){
+    if(SCHEDULE.length===0){
+      $('#matches-list').innerHTML = ui.seasonEmptyHtml();
+      return;
+    }
     const f = state.filter;
     let list = SCHEDULE.slice();
-    if(['BL','DFB','EL','SC'].includes(f)) list = list.filter(m=>m.type===f);
+    if(COMP_TYPES.includes(f)) list = list.filter(m=>m.type===f);
     if(f==='H') list = list.filter(m=>m.loc==='H');
     if(f==='A') list = list.filter(m=>m.loc==='A');
     list.sort((a,b)=>a.date.localeCompare(b.date));
-    $('#matches-list').innerHTML = list.map(m=>ui.matchCard(m)).join('');
+    $('#matches-list').innerHTML = list.length>0
+      ? list.map(m=>ui.matchCard(m)).join('')
+      : '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele in dieser Auswahl</div>';
   },
   matchCard(m){
     const att = (state.attendance[m.id]||[]).length;
@@ -480,8 +588,8 @@ const ui = {
     const m = SCHEDULE.find(x=>x.id===id);
     if(!m) return;
     const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
-    $('#md-title').innerHTML = matchTitle;
-    $('#md-meta').innerHTML = `${fmtDate(m.date)} &middot; ${typeName(m.type)} &middot; ${m.round} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
+    $('#md-title').innerHTML = escapeHtml(matchTitle);
+    $('#md-meta').innerHTML = `${fmtDate(m.date)} &middot; ${typeName(m.type)} &middot; ${escapeHtml(m.round)} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
     ui.renderAttendance();
     ui.showPage('match-detail');
   },
@@ -577,17 +685,18 @@ const ui = {
     const matches = SCHEDULE.filter(m=>{
       if(filter==='H') return m.loc==='H';
       if(filter==='A') return m.loc==='A';
-      if(['BL','DFB','EL','SC'].includes(filter)) return m.type===filter;
+      if(COMP_TYPES.includes(filter)) return m.type===filter;
       return true;
     });
     const matchIds = matches.map(m=>m.id);
     const possible = matchIds.length;
+    const locById = {};
+    matches.forEach(m=>locById[m.id]=m.loc);
     return state.members.map(mem=>{
       let h=0, a=0;
       matchIds.forEach(mid=>{
         if((state.attendance[mid]||[]).includes(mem.id)){
-          const match = SCHEDULE.find(x=>x.id===mid);
-          if(match.loc==='H') h++; else a++;
+          if(locById[mid]==='H') h++; else a++;
         }
       });
       const total = h+a;
@@ -596,13 +705,17 @@ const ui = {
     }).sort((x,y)=>y.total-x.total || y.quota-x.quota || x.name.localeCompare(y.name,'de'));
   },
   renderStats(){
+    if(SCHEDULE.length===0){
+      $('#ranking-list').innerHTML = ui.seasonEmptyHtml();
+      return;
+    }
     const rank = ui.computeRanking(state.statFilter);
     if(rank.length===0){
       $('#ranking-list').innerHTML = '<div class="empty"><div class="ic">&#128202;</div>Keine Mitglieder vorhanden.</div>';
       return;
     }
     const possible = rank[0]?.possible || 0;
-    const filterLabel = ({all:'Alle Wettbewerbe', H:'Heimspiele', A:'Ausw&auml;rtsspiele', BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League'})[state.statFilter];
+    const filterLabel = ({all:'Alle Wettbewerbe', H:'Heimspiele', A:'Ausw&auml;rtsspiele', BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup'})[state.statFilter];
     $('#ranking-list').innerHTML = `<div class="muted" style="margin-bottom:10px;padding:0 4px">${filterLabel} - ${possible} m&ouml;gliche Spiele</div>` +
       rank.map((r,i)=>{
         const medal = i===0?'gold':i===1?'silver':i===2?'bronze':'';
@@ -641,7 +754,7 @@ const ui = {
       <button class="btn btn-sec btn-block" style="color:#c33;border-color:#fcc" onclick="ui.clearAll()">Alle lokalen Daten zur&uuml;cksetzen</button>
       <hr>
       <div class="muted" style="font-size:11px;text-align:center">
-        Spielplan: kicker.de (Saison 2025/26)<br>
+        Spielpl&auml;ne: ${SEASONS.map(s=>escapeHtml(s.label)).join(', ') || '—'}<br>
         Ohne Cloud-Sync werden Daten nur lokal gespeichert.<br>
         Backup regelm&auml;&szlig;ig per Export sichern!
       </div>
@@ -782,6 +895,8 @@ const ui = {
       pendingOps = [];
       saveState();
       savePending();
+      // Falls die Cloud noch alte IDs ohne Saison-Prefix enthält
+      migrateAttendanceIds();
       lastSyncAt = new Date();
       try{ localStorage.setItem('supporters_freudental_lastsync_v1', lastSyncAt.toISOString()); }catch(e){}
       syncStatus = 'ok';
@@ -918,18 +1033,8 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 
 // === EVENTS ===
 $$('.tabbar button').forEach(b=>b.addEventListener('click',()=>ui.showPage(b.dataset.page)));
-$$('#filter-chips .chip').forEach(c=>c.addEventListener('click',()=>{
-  $$('#filter-chips .chip').forEach(x=>x.classList.remove('active'));
-  c.classList.add('active');
-  state.filter = c.dataset.f;
-  ui.renderMatches();
-}));
-$$('#page-stats .chip').forEach(c=>c.addEventListener('click',()=>{
-  $$('#page-stats .chip').forEach(x=>x.classList.remove('active'));
-  c.classList.add('active');
-  state.statFilter = c.dataset.stat;
-  ui.renderStats();
-}));
+$('#seasonSelect').addEventListener('change', e=>setSeason(e.target.value));
+$('#seasonSelectStats').addEventListener('change', e=>setSeason(e.target.value));
 $('#newMemberName').addEventListener('keydown',e=>{if(e.key==='Enter')ui.addMember()});
 $('#modal-overlay').addEventListener('click',e=>{if(e.target.id==='modal-overlay')ui.closeModal()});
 
@@ -979,13 +1084,20 @@ document.addEventListener('click', e=>{
 });
 
 // === INIT ===
-loadState();
-ui.showPage('dashboard');
-ui.updateSyncIndicator();
-// Beim Start automatisch synchronisieren, falls eingerichtet
-if(syncConfig.url){
-  setTimeout(()=>ui.sync(true), 800);
+async function init(){
+  loadState();
+  await loadFixtures();
+  ui.renderSeasonSelects();
+  ui.renderHeaderSeason();
+  ui.renderFilterChips();
+  ui.renderStatChips();
+  ui.showPage('dashboard');
+  ui.updateSyncIndicator();
+  if(syncConfig.url){
+    setTimeout(()=>ui.sync(true), 800);
+  }
 }
+init();
 // Online/Offline-Erkennung
 window.addEventListener('online', ()=>{ if(syncConfig.url) ui.sync(true); });
 window.addEventListener('offline', ()=>{

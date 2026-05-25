@@ -3,7 +3,7 @@
  * Ermöglicht Offline-Nutzung: cached die App-Dateien beim ersten Besuch,
  * danach läuft die App auch ohne Internetverbindung (Daten in localStorage).
  */
-const CACHE_NAME = 'supporters-freudental-v2';
+const CACHE_NAME = 'supporters-freudental-v3';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -16,7 +16,10 @@ const PRECACHE_URLS = [
   './apple-touch-icon-152.png',
   './apple-touch-icon-167.png',
   './favicon-16.png',
-  './favicon-32.png'
+  './favicon-32.png',
+  './fixtures/index.json',
+  './fixtures/2025-26.json',
+  './fixtures/2026-27.json'
 ];
 
 self.addEventListener('install', event => {
