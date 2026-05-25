@@ -419,6 +419,32 @@ function queueOp(op){
   ui.updateSyncIndicator();
 }
 
+// Wendet eine Operation lokal an - exakt gleiche Semantik wie das Apps Script.
+// Wird benutzt, um nach einem Server-Pull noch nicht gesendete Ops "nachzulegen",
+// damit die UI nicht zwischen Tap und Sync-Antwort zurückspringt.
+function applyOpLocally(op){
+  if(!op || !op.op) return;
+  if(op.op === 'addMember'){
+    if(!state.members.some(m => m.id === op.id)){
+      state.members.push({id: op.id, name: op.name});
+    } else {
+      state.members = state.members.map(m => m.id === op.id ? {id: op.id, name: op.name} : m);
+    }
+  } else if(op.op === 'removeMember'){
+    state.members = state.members.filter(m => m.id !== op.id);
+    Object.keys(state.attendance).forEach(k => {
+      state.attendance[k] = state.attendance[k].filter(x => x !== op.id);
+      if(state.attendance[k].length === 0) delete state.attendance[k];
+    });
+  } else if(op.op === 'setAttendance'){
+    if(op.memberIds && op.memberIds.length > 0){
+      state.attendance[op.matchId] = op.memberIds.slice();
+    } else {
+      delete state.attendance[op.matchId];
+    }
+  }
+}
+
 // === HELPERS ===
 const $ = s => document.querySelector(s);
 const $$ = s => document.querySelectorAll(s);
@@ -875,8 +901,12 @@ const ui = {
     ui.updateSyncIndicator();
     try{
       let response;
-      const ops = pendingOps.slice();
-      if(ops.length>0){
+      // Snapshot der Ops, die wir JETZT senden. memberIds tief kopieren, damit
+      // spätere lokale Mutationen (Taps während fetch läuft) den gesendeten
+      // Payload nicht verfälschen.
+      const ops = pendingOps.map(op => Object.assign({}, op, op.memberIds ? {memberIds: op.memberIds.slice()} : {}));
+      const opsCount = ops.length;
+      if(opsCount>0){
         response = await fetch(syncConfig.url, {
           method:'POST',
           body:JSON.stringify({token:syncConfig.token, userName:syncConfig.userName||'unbekannt', operations:ops}),
@@ -889,10 +919,15 @@ const ui = {
       if(!response.ok) throw new Error('HTTP ' + response.status);
       const data = await response.json();
       if(!data.ok) throw new Error(data.error || 'Unbekannter Fehler');
-      // Server-State &uuml;bernehmen
+      // Server-State übernehmen
       state.members = data.data.members || [];
       state.attendance = data.data.attendance || {};
-      pendingOps = [];
+      // Nur die Ops verwerfen, die wir wirklich gesendet haben - in der Zwischenzeit
+      // können durch User-Taps neue Ops dazugekommen sein.
+      pendingOps.splice(0, opsCount);
+      // Diese noch nicht gesendeten Ops auf den frischen Server-State anwenden,
+      // damit die UI nicht zwischen Tap und Sync-Antwort zurückspringt.
+      pendingOps.forEach(applyOpLocally);
       saveState();
       savePending();
       // Falls die Cloud noch alte IDs ohne Saison-Prefix enthält
@@ -901,12 +936,17 @@ const ui = {
       try{ localStorage.setItem('supporters_freudental_lastsync_v1', lastSyncAt.toISOString()); }catch(e){}
       syncStatus = 'ok';
       lastSyncError = '';
-      if(!silent) toast('Synchronisiert &#10003;');
+      if(!silent && pendingOps.length===0) toast('Synchronisiert &#10003;');
       // Aktive Seite neu rendern
       const active = document.querySelector('.page.active');
       if(active){
         const name = active.id.replace('page-','');
         if(name==='match-detail') ui.renderAttendance(); else ui.showPage(name);
+      }
+      // Wenn während des Syncs neue Änderungen aufgelaufen sind: gleich erneut senden.
+      if(pendingOps.length > 0){
+        clearTimeout(syncDebounceTimer);
+        syncDebounceTimer = setTimeout(()=>ui.sync(true), 150);
       }
     }catch(err){
       syncStatus = 'error';
