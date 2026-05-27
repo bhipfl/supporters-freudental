@@ -1059,16 +1059,16 @@ const ui = {
       // Payload nicht verfälschen.
       const ops = pendingOps.map(op => Object.assign({}, op, op.memberIds ? {memberIds: op.memberIds.slice()} : {}));
       const opsCount = ops.length;
-      if(opsCount>0){
-        response = await fetch(a.url, {
-          method:'POST',
-          body:JSON.stringify({token:a.token, userName:syncConfig.userName||state.myMemberId||'unbekannt', operations:ops}),
-          headers:{'Content-Type':'text/plain;charset=utf-8'},
-          redirect:'follow'
-        });
-      } else {
-        response = await fetch(a.url + (a.url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(a.token), {redirect:'follow'});
-      }
+      // Immer POST mit text/plain - Apps Script gibt bei Cross-Origin GET-Redirects
+      // keinen CORS-Header zurück, Browser blockiert. POST mit text/plain umgeht
+      // sowohl Preflight als auch das GET-CORS-Problem. Leere ops-Liste ist
+      // serverseitig ein reiner Pull.
+      response = await fetch(a.url, {
+        method:'POST',
+        body:JSON.stringify({token:a.token, userName:syncConfig.userName||state.myMemberId||'unbekannt', operations:ops}),
+        headers:{'Content-Type':'text/plain;charset=utf-8'},
+        redirect:'follow'
+      });
       if(!response.ok) throw new Error('HTTP ' + response.status);
       const data = await response.json();
       if(!data.ok) throw new Error(data.error || 'Unbekannter Fehler');
