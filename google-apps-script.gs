@@ -368,7 +368,7 @@ function migrateExistingMembers() {
  * konfigurieren muss.
  */
 function logAllMemberLinks() {
-  const scriptUrl = ScriptApp.getService().getUrl();
+  const scriptUrl = getWebAppExecUrl();
   if (!scriptUrl) {
     Logger.log('FEHLER: Script ist noch nicht bereitgestellt. Erst "Bereitstellen > Web-App" durchführen.');
     return;
@@ -391,6 +391,19 @@ function logAllMemberLinks() {
   });
 }
 
+/**
+ * Liefert die /exec-URL der deployten Web-App.
+ * ScriptApp.getService().getUrl() gibt im Editor-Kontext immer /dev zurück
+ * (selbst wenn deployed) - das funktioniert nur für den Script-Besitzer.
+ * Für öffentliche Links brauchen wir /exec.
+ */
+function getWebAppExecUrl() {
+  let url = ScriptApp.getService().getUrl();
+  if (!url) return '';
+  if (url.endsWith('/dev')) url = url.slice(0, -4) + '/exec';
+  return url;
+}
+
 function buildMemberLink(memberId, token, scriptUrl) {
   return APP_BASE_URL + '/#u=' + encodeURIComponent(memberId)
     + '&t=' + encodeURIComponent(token)
@@ -402,7 +415,7 @@ function buildMemberLink(memberId, token, scriptUrl) {
  * Im Apps-Script-Editor manuell aufrufen, z.B. rotateToken('mp1234abc')
  */
 function rotateToken(memberId) {
-  const scriptUrl = ScriptApp.getService().getUrl();
+  const scriptUrl = getWebAppExecUrl();
   const ss = SpreadsheetApp.getActive();
   const memSheet = ss.getSheetByName(MEMBERS_SHEET);
   const row = findMemberRow(memSheet, memberId);
