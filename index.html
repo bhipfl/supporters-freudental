@@ -57,7 +57,14 @@ header .head-actions button{background:rgba(255,255,255,.18);border:0;color:#fff
 .filter-chips{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
 .chip{background:#fff;border:1px solid #d8dae0;border-radius:18px;padding:6px 12px;font-size:12px;font-weight:600;color:#555;white-space:nowrap;cursor:pointer;transition:.15s}
 .chip.active{background:#E32219;color:#fff;border-color:#E32219}
-.match{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:transform .1s}
+.match{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);cursor:pointer;transition:transform .1s;border-left:4px solid transparent}
+.match.my-present{border-left-color:#1f8a3a}
+.match.my-absent{border-left-color:#c92e22}
+.match.my-open{border-left-color:#f1c40f}
+.my-vote-pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0}
+.my-vote-pill.my-present{background:#e7f6ec;color:#1f8a3a}
+.my-vote-pill.my-absent{background:#fde8e6;color:#c92e22}
+.my-vote-pill.my-open{background:#fff8e0;color:#a07a00}
 .match:active{transform:scale(.98)}
 .match-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .match-date{font-size:11px;color:#888;font-weight:600;flex-shrink:0}
@@ -810,10 +817,27 @@ const ui = {
   matchCard(m){
     const att = getPresentMembers(m.id).length;
     const matchTitle = m.loc==='H' ? `VfB Stuttgart - ${m.opp}` : `${m.opp} - VfB Stuttgart`;
-    return `<div class="match" onclick="ui.openMatch('${m.id}')">
+    // Eigener Vote-Status im Member-Modus: farbiger Rand-Balken + Pille im Header
+    let myClass = '';
+    let myPill = '';
+    if(state.role === 'member' && state.myMemberId){
+      const myStatus = getStatus(m.id, state.myMemberId);
+      if(myStatus === 'present'){
+        myClass = 'my-present';
+        myPill = '<span class="my-vote-pill my-present">&#10003; Dabei</span>';
+      } else if(myStatus === 'absent'){
+        myClass = 'my-absent';
+        myPill = '<span class="my-vote-pill my-absent">&#10007; Nicht dabei</span>';
+      } else {
+        myClass = 'my-open';
+        myPill = '<span class="my-vote-pill my-open">offen</span>';
+      }
+    }
+    return `<div class="match ${myClass}" onclick="ui.openMatch('${m.id}')">
       <div class="match-hdr">
         <div class="match-date">${fmtDateShort(m.date)}</div>
         <div class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</div>
+        ${myPill}
         <div class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>
       </div>
       <div class="match-teams">${matchTitle}</div>

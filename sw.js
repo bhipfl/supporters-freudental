@@ -3,7 +3,7 @@
  * Ermöglicht Offline-Nutzung: cached die App-Dateien beim ersten Besuch,
  * danach läuft die App auch ohne Internetverbindung (Daten in localStorage).
  */
-const CACHE_NAME = 'supporters-freudental-v10';
+const CACHE_NAME = 'supporters-freudental-v11';
 const PRECACHE_URLS = [
   './',
   './index.html',
