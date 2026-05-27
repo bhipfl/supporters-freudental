@@ -156,10 +156,23 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .match-nav button:disabled{opacity:.35;cursor:not-allowed}
 .match-nav button:active:not(:disabled){background:#f0f1f4}
 .match-nav .sub{display:block;font-size:10px;color:#888;font-weight:500;margin-top:2px}
+.attend-row.attend-row-3state{cursor:default;background:#fff}
+.attend-row.attend-row-3state.on{background:#e7f6ec;border-left:4px solid #1f8a3a}
+.attend-row.attend-row-3state.off{background:#fde8e6;border-left:4px solid #c92e22}
 .attend-row.readonly{opacity:.85;cursor:default}
 .attend-row.readonly:active{transform:none}
 .attend-row.self{border:2px solid #E32219}
 .attend-row.self.on{border-color:#1f8a3a}
+.attend-row.self.off{border-color:#c92e22}
+.vote-btns{display:flex;gap:6px;flex-shrink:0}
+.vote{width:36px;height:36px;border-radius:50%;border:2px solid #d8dae0;background:#fff;color:#888;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;flex-shrink:0;padding:0}
+.vote:active{transform:scale(.92)}
+.vote-yes.active{background:#1f8a3a;border-color:#1f8a3a;color:#fff}
+.vote-no.active{background:#c92e22;border-color:#c92e22;color:#fff}
+.status-indicator{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
+.status-indicator .muted{color:#bbb;font-size:14px}
+.attend-row.on .status-indicator{color:#1f8a3a}
+.attend-row.off .status-indicator{color:#c92e22}
 .self-tag{display:inline-block;background:#E32219;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
 .attend-row.on .self-tag{background:#1f8a3a}
 body.role-member .admin-only{display:none !important}
@@ -248,8 +261,8 @@ body.role-member .tabbar button[data-page="members"]{display:none}
       <div style="display:flex;justify-content:space-between;align-items:center">
         <strong id="md-count">0 von 0 anwesend</strong>
         <div class="admin-only" style="display:flex;gap:6px">
-          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(true)">Alle</button>
-          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(false)">Keiner</button>
+          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll('present')">Alle dabei</button>
+          <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll('reset')">Reset</button>
         </div>
       </div>
     </div>
@@ -288,6 +301,7 @@ const SYNC_KEY = 'supporters_freudental_sync_v1';
 const PENDING_KEY = 'supporters_freudental_pending_v1';
 const SEASON_KEY = 'supporters_freudental_season_v1';
 const MIGRATION_KEY = 'supporters_freudental_migrated_v2';
+const MIGRATION_3STATE_KEY = 'supporters_freudental_migrated_3state_v1';
 const MEMBER_AUTH_KEY = 'supporters_freudental_member_auth_v1'; // {id, token, syncUrl}
 let state = {
   members: [],         // [{id, name}]
@@ -334,23 +348,45 @@ function loadState(){
     if(s) state.seasonId = s;
   }catch(e){}
   migrateAttendanceIds();
+  migrateAttendanceTo3State();
+}
+
+// Migration: state.attendance wandelt von Array-Form (Liste der Anwesenden)
+// zu Object-Form (memberId → 'present'|'absent') um. Bestehende Einträge
+// werden alle als 'present' interpretiert.
+function migrateAttendanceTo3State(){
+  try{
+    let changed = false;
+    Object.keys(state.attendance).forEach(matchId => {
+      const val = state.attendance[matchId];
+      if(Array.isArray(val)){
+        const obj = {};
+        val.forEach(memberId => { obj[memberId] = 'present'; });
+        state.attendance[matchId] = obj;
+        changed = true;
+      }
+    });
+    if(changed) saveState();
+    localStorage.setItem(MIGRATION_3STATE_KEY, '1');
+  }catch(e){console.error('3-State migration failed', e)}
 }
 
 // Idempotente Migration: Attendance-Keys ohne Saison-Prefix bekommen
 // '2526-' vorangestellt (alle Alt-Daten stammen aus Saison 2025/26).
 // Wird beim Start und nach jedem Cloud-Pull aufgerufen. Konflikte werden
-// per Set-Union gemerged, sodass keine Daten verloren gehen.
+// gemerged, sodass keine Daten verloren gehen. Behandelt sowohl die alte
+// Array-Form als auch die neue Object-Form ({memberId: status}).
 function migrateAttendanceIds(){
   try{
     const renamed = [];
     Object.keys(state.attendance).slice().forEach(key=>{
       if(key.includes('-')) return;
       const newKey = FALLBACK_SEASON_ID + '-' + key;
-      const oldList = state.attendance[key] || [];
+      const oldVal = state.attendance[key];
       if(state.attendance[newKey]){
-        state.attendance[newKey] = Array.from(new Set([...(state.attendance[newKey]||[]), ...oldList]));
+        state.attendance[newKey] = mergeAttendance(state.attendance[newKey], oldVal);
       } else {
-        state.attendance[newKey] = oldList;
+        state.attendance[newKey] = oldVal;
       }
       delete state.attendance[key];
       renamed.push(newKey);
@@ -358,12 +394,31 @@ function migrateAttendanceIds(){
     if(renamed.length>0){
       saveState();
       renamed.forEach(k=>{
-        pendingOps.push({op:'setAttendance', matchId:k, memberIds:state.attendance[k]});
+        // Migriertes Object als setSelfAttendance-Ops für jeden Member queue'n
+        const val = state.attendance[k];
+        if(val && typeof val === 'object' && !Array.isArray(val)){
+          Object.keys(val).forEach(memberId => {
+            pendingOps.push({op:'setSelfAttendance', matchId:k, memberId, present: val[memberId] === 'present'});
+          });
+        }
       });
       savePending();
     }
     localStorage.setItem(MIGRATION_KEY, '1');
   }catch(e){console.error('Migration failed', e)}
+}
+
+// Helper: zwei attendance-Werte mergen, beide könnten Array oder Object sein
+function mergeAttendance(a, b){
+  const aObj = Array.isArray(a) ? attendanceArrayToObject(a) : (a || {});
+  const bObj = Array.isArray(b) ? attendanceArrayToObject(b) : (b || {});
+  return Object.assign({}, aObj, bObj);
+}
+
+function attendanceArrayToObject(arr){
+  const o = {};
+  arr.forEach(id => { o[id] = 'present'; });
+  return o;
 }
 
 function saveSeasonChoice(){
@@ -503,6 +558,37 @@ function queueOp(op){
 // Wendet eine Operation lokal an - exakt gleiche Semantik wie das Apps Script.
 // Wird benutzt, um nach einem Server-Pull noch nicht gesendete Ops "nachzulegen",
 // damit die UI nicht zwischen Tap und Sync-Antwort zurückspringt.
+// Helper für 3-State Attendance. state.attendance[matchId] kann Object oder
+// (legacy) Array sein - die Helper kapseln beide Formen.
+function getStatus(matchId, memberId){
+  const m = state.attendance[matchId];
+  if(!m) return undefined;
+  if(Array.isArray(m)) return m.includes(memberId) ? 'present' : undefined;
+  return m[memberId];
+}
+function isPresent(matchId, memberId){
+  return getStatus(matchId, memberId) === 'present';
+}
+function getPresentMembers(matchId){
+  const m = state.attendance[matchId];
+  if(!m) return [];
+  if(Array.isArray(m)) return m.slice();
+  return Object.keys(m).filter(id => m[id] === 'present');
+}
+function memberPresentGameCount(memberId){
+  let count = 0;
+  Object.values(state.attendance).forEach(a => {
+    if(Array.isArray(a)){ if(a.includes(memberId)) count++; }
+    else if(a && a[memberId] === 'present') count++;
+  });
+  return count;
+}
+function ensureAttendanceObject(matchId){
+  const cur = state.attendance[matchId];
+  if(!cur) state.attendance[matchId] = {};
+  else if(Array.isArray(cur)) state.attendance[matchId] = attendanceArrayToObject(cur);
+}
+
 function buildMemberLinkApp(memberId, token, scriptUrl){
   return location.origin + location.pathname + '#u=' + encodeURIComponent(memberId)
     + '&t=' + encodeURIComponent(token)
@@ -524,22 +610,19 @@ function applyOpLocally(op){
       if(state.attendance[k].length === 0) delete state.attendance[k];
     });
   } else if(op.op === 'setAttendance'){
-    if(op.memberIds && op.memberIds.length > 0){
-      state.attendance[op.matchId] = op.memberIds.slice();
-    } else {
-      delete state.attendance[op.matchId];
-    }
+    // Bulk-Admin: alle gelisteten als 'present', vorhandene 'absent' bleiben unangetastet
+    ensureAttendanceObject(op.matchId);
+    (op.memberIds || []).forEach(mid => { state.attendance[op.matchId][mid] = 'present'; });
+    if(Object.keys(state.attendance[op.matchId]).length === 0) delete state.attendance[op.matchId];
   } else if(op.op === 'setSelfAttendance'){
-    // Welche memberId? Im Member-Modus ist es state.myMemberId.
-    // Im Admin-Fall (sollte selten vorkommen) wird sie aus der Op übernommen.
     const memberId = state.role === 'member' ? state.myMemberId : op.memberId;
     if(!memberId) return;
-    if(!state.attendance[op.matchId]) state.attendance[op.matchId] = [];
-    const arr = state.attendance[op.matchId];
-    const idx = arr.indexOf(memberId);
-    if(op.present && idx < 0) arr.push(memberId);
-    if(!op.present && idx >= 0) arr.splice(idx, 1);
-    if(arr.length === 0) delete state.attendance[op.matchId];
+    ensureAttendanceObject(op.matchId);
+    const obj = state.attendance[op.matchId];
+    if(op.clear === true) delete obj[memberId];
+    else if(op.present === true) obj[memberId] = 'present';
+    else if(op.present === false) obj[memberId] = 'absent';
+    if(Object.keys(obj).length === 0) delete state.attendance[op.matchId];
   }
 }
 
@@ -667,9 +750,9 @@ const ui = {
     $('#stat-members').textContent = state.members.length;
     // Stat-Werte beziehen sich auf die aktuell gewählte Saison
     const matchIds = SCHEDULE.map(m=>m.id);
-    const done = matchIds.filter(id=>(state.attendance[id]||[]).length>0).length;
+    const done = matchIds.filter(id => getPresentMembers(id).length > 0).length;
     $('#stat-games-done').textContent = done;
-    const totalAtt = matchIds.reduce((s,id)=>s + (state.attendance[id]||[]).length, 0);
+    const totalAtt = matchIds.reduce((s,id) => s + getPresentMembers(id).length, 0);
     $('#stat-avg').textContent = done>0 ? (totalAtt/done).toFixed(1) : '0';
 
     // Upcoming - next 5 matches >= today
@@ -725,7 +808,7 @@ const ui = {
       : '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele in dieser Auswahl</div>';
   },
   matchCard(m){
-    const att = (state.attendance[m.id]||[]).length;
+    const att = getPresentMembers(m.id).length;
     const matchTitle = m.loc==='H' ? `VfB Stuttgart - ${m.opp}` : `${m.opp} - VfB Stuttgart`;
     return `<div class="match" onclick="ui.openMatch('${m.id}')">
       <div class="match-hdr">
@@ -788,9 +871,9 @@ const ui = {
   },
   renderAttendance(){
     const id = state.currentMatchId;
-    const present = state.attendance[id] || [];
     const total = state.members.length;
-    $('#md-count').textContent = `${present.length} von ${total} anwesend`;
+    const presentCount = getPresentMembers(id).length;
+    $('#md-count').textContent = `${presentCount} von ${total} anwesend`;
     if(total===0){
       $('#attend-list').innerHTML = '<div class="empty"><div class="ic">&#128101;</div>Bitte zuerst Mitglieder auf der Mitglieder-Seite anlegen.</div>';
       return;
@@ -798,53 +881,77 @@ const ui = {
     const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
     const isMember = state.role === 'member';
     $('#attend-list').innerHTML = sorted.map(m=>{
-      const on = present.includes(m.id);
+      const status = getStatus(id, m.id);
       const isSelf = isMember && m.id === state.myMemberId;
       const interactive = !isMember || isSelf;
-      const cls = ['attend-row'];
-      if(on) cls.push('on');
+      const cls = ['attend-row', 'attend-row-3state'];
+      if(status === 'present') cls.push('on');
+      if(status === 'absent') cls.push('off');
       if(isMember && !isSelf) cls.push('readonly');
       if(isSelf) cls.push('self');
-      const click = interactive ? `onclick="ui.toggleAttendance('${m.id}')"` : '';
       const namePart = isSelf ? `${escapeHtml(m.name)} <span class="self-tag">du</span>` : escapeHtml(m.name);
-      return `<div class="${cls.join(' ')}" ${click}>
+      const presentActive = status === 'present' ? 'active' : '';
+      const absentActive = status === 'absent' ? 'active' : '';
+      const buttons = interactive
+        ? `<div class="vote-btns">
+             <button class="vote vote-yes ${presentActive}" onclick="event.stopPropagation();ui.setVote('${m.id}','present')" title="Dabei">&#10003;</button>
+             <button class="vote vote-no ${absentActive}" onclick="event.stopPropagation();ui.setVote('${m.id}','absent')" title="Nicht dabei">&#10007;</button>
+           </div>`
+        : `<div class="status-indicator">${status === 'present' ? '&#10003;' : status === 'absent' ? '&#10007;' : '<span class="muted">—</span>'}</div>`;
+      return `<div class="${cls.join(' ')}">
         <div class="avatar">${initials(m.name)}</div>
         <div class="name">${namePart}</div>
-        <div class="check">${on?'&#10003;':''}</div>
+        ${buttons}
       </div>`;
     }).join('');
   },
-  toggleAttendance(memberId){
-    // Member-Modus: nur eigene Anwesenheit toggeln, andere ignorieren
+  setVote(memberId, action){
+    // action: 'present' | 'absent'
+    // Member-Modus: nur eigene Anwesenheit, andere ignorieren
     if(state.role === 'member' && memberId !== state.myMemberId) return;
     const id = state.currentMatchId;
-    if(!state.attendance[id]) state.attendance[id] = [];
-    const arr = state.attendance[id];
-    const idx = arr.indexOf(memberId);
-    const willBePresent = idx < 0;
-    if(idx>=0) arr.splice(idx,1); else arr.push(memberId);
-    if(arr.length===0) delete state.attendance[id];
+    const currentStatus = getStatus(id, memberId);
+    // Nochmal auf den aktiven Button = zurück auf "nicht abgestimmt"
+    const newStatus = currentStatus === action ? null : action;
+    // Lokal updaten
+    ensureAttendanceObject(id);
+    const obj = state.attendance[id];
+    if(newStatus === null) delete obj[memberId];
+    else obj[memberId] = newStatus;
+    if(Object.keys(obj).length === 0) delete state.attendance[id];
     saveState();
-    if(state.role === 'member'){
-      // Diff-basierte Op - sicher gegen Race und respektiert Server-Auth
-      queueOp({op:'setSelfAttendance', matchId:id, present:willBePresent});
-    } else {
-      queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
-    }
+    // Op queue'n: setSelfAttendance mit present/absent/clear
+    const op = {op:'setSelfAttendance', matchId:id};
+    if(newStatus === 'present') op.present = true;
+    else if(newStatus === 'absent') op.present = false;
+    else op.clear = true;
+    if(state.role === 'admin') op.memberId = memberId;
+    queueOp(op);
     ui.renderAttendance();
   },
-  markAll(on){
-    if(state.role === 'member') return; // im Member-Modus nicht erlaubt
+  markAll(action){
+    // action: 'present' (alle dabei) | 'reset' (alle Einträge löschen)
+    if(state.role === 'member') return;
     const id = state.currentMatchId;
-    if(on){
-      state.attendance[id] = state.members.map(m=>m.id);
-    } else {
+    if(action === 'present'){
+      ensureAttendanceObject(id);
+      state.members.forEach(m => {
+        state.attendance[id][m.id] = 'present';
+        queueOp({op:'setSelfAttendance', matchId:id, memberId:m.id, present:true});
+      });
+      toast('Alle als anwesend markiert');
+    } else if(action === 'reset'){
+      const existing = state.attendance[id];
+      if(existing && typeof existing === 'object' && !Array.isArray(existing)){
+        Object.keys(existing).forEach(memberId => {
+          queueOp({op:'setSelfAttendance', matchId:id, memberId, clear:true});
+        });
+      }
       delete state.attendance[id];
+      toast('Zur&uuml;ckgesetzt');
     }
     saveState();
-    queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
     ui.renderAttendance();
-    toast(on?'Alle als anwesend markiert':'Alle abgew&auml;hlt');
   },
   renderMembers(){
     if(state.members.length===0){
@@ -853,7 +960,7 @@ const ui = {
     }
     const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
     $('#member-list').innerHTML = sorted.map(m=>{
-      const games = Object.values(state.attendance).filter(a=>a.includes(m.id)).length;
+      const games = memberPresentGameCount(m.id);
       // Im Admin-Modus Link-Button zeigen, sobald Token bekannt ist
       const showLinkBtn = state.role === 'admin' && m.token;
       const linkBtn = showLinkBtn
@@ -915,8 +1022,14 @@ const ui = {
     ui.confirm(`"${m.name}" wirklich entfernen?<br><span class="muted">Alle Anwesenheits-Eintr&auml;ge dieser Person werden ebenfalls gel&ouml;scht.</span>`, ()=>{
       state.members = state.members.filter(x=>x.id!==id);
       Object.keys(state.attendance).forEach(k=>{
-        state.attendance[k] = state.attendance[k].filter(x=>x!==id);
-        if(state.attendance[k].length===0) delete state.attendance[k];
+        const a = state.attendance[k];
+        if(Array.isArray(a)){
+          state.attendance[k] = a.filter(x=>x!==id);
+          if(state.attendance[k].length===0) delete state.attendance[k];
+        } else if(a && typeof a === 'object'){
+          delete a[id];
+          if(Object.keys(a).length===0) delete state.attendance[k];
+        }
       });
       saveState();
       queueOp({op:'removeMember', id});
@@ -938,7 +1051,7 @@ const ui = {
     return state.members.map(mem=>{
       let h=0, a=0;
       matchIds.forEach(mid=>{
-        if((state.attendance[mid]||[]).includes(mem.id)){
+        if(isPresent(mid, mem.id)){
           if(locById[mid]==='H') h++; else a++;
         }
       });
@@ -979,7 +1092,10 @@ const ui = {
       return;
     }
     const total = state.members.length;
-    const totalAtt = Object.values(state.attendance).reduce((s,a)=>s+a.length,0);
+    const totalAtt = Object.values(state.attendance).reduce((s,a) => {
+      if(Array.isArray(a)) return s + a.length;
+      return s + Object.values(a).filter(v => v === 'present').length;
+    }, 0);
     const syncOn = !!syncConfig.url;
     const lastSyncTxt = lastSyncAt ? lastSyncAt.toLocaleString('de-DE') : 'noch nie';
     $('#modal-content').innerHTML = `
@@ -1013,7 +1129,7 @@ const ui = {
   showMemberSettings(){
     const me = state.members.find(m => m.id === state.myMemberId);
     const myMatchIds = SCHEDULE.map(m=>m.id);
-    const myCount = myMatchIds.filter(id => (state.attendance[id]||[]).includes(state.myMemberId)).length;
+    const myCount = myMatchIds.filter(id => isPresent(id, state.myMemberId)).length;
     const lastSyncTxt = lastSyncAt ? lastSyncAt.toLocaleString('de-DE') : 'noch nie';
     $('#modal-content').innerHTML = `
       <h3>Mein Account</h3>

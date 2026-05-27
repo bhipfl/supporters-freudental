@@ -141,15 +141,18 @@ function getCurrentState(includeTokens) {
     });
   }
 
+  // 3-State Format: attendance[matchId] = {memberId: 'present'|'absent'}
+  // Einträge ohne Status-Spalte D werden als 'present' interpretiert (Legacy).
   const attendance = {};
   if (attSheet.getLastRow() > 1) {
-    const attData = attSheet.getRange(2, 1, attSheet.getLastRow() - 1, 2).getValues();
+    const attData = attSheet.getRange(2, 1, attSheet.getLastRow() - 1, 4).getValues();
     attData.forEach(row => {
       const matchId = String(row[0] || '');
       const memberId = String(row[1] || '');
+      const status = String(row[3] || 'present');
       if (matchId && memberId) {
-        if (!attendance[matchId]) attendance[matchId] = [];
-        if (attendance[matchId].indexOf(memberId) < 0) attendance[matchId].push(memberId);
+        if (!attendance[matchId]) attendance[matchId] = {};
+        attendance[matchId][memberId] = status === 'absent' ? 'absent' : 'present';
       }
     });
   }
@@ -201,10 +204,12 @@ function applyOperations(ops, userName, auth) {
     }
 
     else if (op.op === 'setAttendance') {
+      // Legacy/Bulk: setzt alle gelisteten Member auf 'present'. 'absent'-Einträge
+      // bleiben unverändert (nicht-destruktiv für 3-State-Daten).
       if (auth.role !== 'admin') return;
-      replaceAttendanceForMatch(attSheet, op.matchId, op.memberIds || [], now);
+      bulkSetPresent(attSheet, op.matchId, op.memberIds || [], now);
       audSheet.appendRow([now, userName, 'setAttendance',
-        'Spiel ' + op.matchId + ': ' + (op.memberIds || []).length + ' Fans']);
+        'Spiel ' + op.matchId + ': ' + (op.memberIds || []).length + ' Fans dabei']);
       applied++;
     }
 
@@ -212,16 +217,23 @@ function applyOperations(ops, userName, auth) {
     else if (op.op === 'setSelfAttendance') {
       // memberId KOMMT AUS DEM TOKEN, nicht aus dem Body — verhindert dass
       // ein Member sich als jemand anderes eintragen kann.
+      // Admins dürfen via op.memberId auch für andere setzen.
       const memberId = (auth.role === 'member') ? auth.memberId : String(op.memberId || '');
       if (!memberId) return;
       const matchId = String(op.matchId || '');
       if (!matchId) return;
-      const present = !!op.present;
-      const changed = setSingleAttendance(attSheet, matchId, memberId, present, now);
+      // 3-State: present/absent/clear
+      let status = null;
+      if (op.clear === true) status = null;
+      else if (op.present === true) status = 'present';
+      else if (op.present === false) status = 'absent';
+      else return;
+      const changed = setSingleAttendance(attSheet, matchId, memberId, status, now);
       if (changed) {
         const tag = (auth.role === 'member') ? 'self' : 'admin-as-' + memberId;
+        const statusLabel = status === 'present' ? 'dabei' : (status === 'absent' ? 'nicht dabei' : 'zurueckgesetzt');
         audSheet.appendRow([now, userName + ' (' + tag + ')', 'setSelfAttendance',
-          'Spiel ' + matchId + ': ' + memberId + ' = ' + (present ? 'dabei' : 'nicht dabei')]);
+          'Spiel ' + matchId + ': ' + memberId + ' = ' + statusLabel]);
       }
       applied++;
     }
@@ -263,29 +275,44 @@ function removeMatchEntriesForMember(attSheet, memberId) {
 }
 
 function replaceAttendanceForMatch(attSheet, matchId, memberIds, now) {
+  // Legacy: löscht ALLE Einträge für matchId und ersetzt durch present-Liste.
+  // Wird nicht mehr aktiv genutzt - bulkSetPresent ist 3-State-freundlich.
   if (attSheet.getLastRow() > 1) {
     const data = attSheet.getRange(2, 1, attSheet.getLastRow() - 1, 1).getValues();
     for (let i = data.length - 1; i >= 0; i--) {
       if (String(data[i][0]) === String(matchId)) attSheet.deleteRow(i + 2);
     }
   }
-  const rows = memberIds.map(function(mid) { return [String(matchId), String(mid), now]; });
+  const rows = memberIds.map(function(mid) { return [String(matchId), String(mid), now, 'present']; });
   if (rows.length > 0) {
-    attSheet.getRange(attSheet.getLastRow() + 1, 1, rows.length, 3).setValues(rows);
+    attSheet.getRange(attSheet.getLastRow() + 1, 1, rows.length, 4).setValues(rows);
   }
 }
 
-function setSingleAttendance(attSheet, matchId, memberId, present, now) {
+function bulkSetPresent(attSheet, matchId, memberIds, now) {
+  // Setzt alle gelisteten Member auf 'present'. Bestehende 'absent'-Einträge
+  // bleiben unangetastet.
+  memberIds.forEach(mid => setSingleAttendance(attSheet, matchId, mid, 'present', now));
+}
+
+function setSingleAttendance(attSheet, matchId, memberId, status, now) {
+  // status: 'present' | 'absent' | null (= Eintrag entfernen / zurück zu "nicht abgestimmt")
   const existing = findAttendanceRow(attSheet, matchId, memberId);
-  if (present && existing < 0) {
-    attSheet.appendRow([String(matchId), String(memberId), now]);
+  if (status === null) {
+    if (existing > 0) {
+      attSheet.deleteRow(existing);
+      return true;
+    }
+    return false;
+  }
+  if (existing > 0) {
+    // Update Status-Spalte
+    attSheet.getRange(existing, 4).setValue(status);
     return true;
   }
-  if (!present && existing > 0) {
-    attSheet.deleteRow(existing);
-    return true;
-  }
-  return false;
+  // Neuer Eintrag
+  attSheet.appendRow([String(matchId), String(memberId), now, status]);
+  return true;
 }
 
 function initSheetsIfNeeded(ss) {
@@ -308,12 +335,20 @@ function initSheetsIfNeeded(ss) {
   }
   if (!ss.getSheetByName(ATTENDANCE_SHEET)) {
     const s = ss.insertSheet(ATTENDANCE_SHEET);
-    s.appendRow(['matchId', 'memberId', 'createdAt']);
+    s.appendRow(['matchId', 'memberId', 'createdAt', 'status']);
     s.setFrozenRows(1);
-    s.getRange('A1:C1').setFontWeight('bold').setBackground('#E32219').setFontColor('#fff');
+    s.getRange('A1:D1').setFontWeight('bold').setBackground('#E32219').setFontColor('#fff');
     s.setColumnWidth(1, 130);
     s.setColumnWidth(2, 180);
     s.setColumnWidth(3, 160);
+    s.setColumnWidth(4, 90);
+  } else {
+    // Bestehendes Sheet: ggf. Status-Spalte ergänzen
+    const s = ss.getSheetByName(ATTENDANCE_SHEET);
+    if (s.getLastColumn() < 4) {
+      s.getRange(1, 4).setValue('status').setFontWeight('bold').setBackground('#E32219').setFontColor('#fff');
+      s.setColumnWidth(4, 90);
+    }
   }
   if (!ss.getSheetByName(AUDIT_SHEET)) {
     const s = ss.insertSheet(AUDIT_SHEET);
@@ -340,6 +375,30 @@ function jsonResponse(obj) {
   return ContentService
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Migration v2 zu v3: ergänzt Status-Spalte im Anwesenheits-Sheet und setzt
+ * bestehende Einträge auf 'present'. Idempotent - mehrfach aufrufbar.
+ * Manuell aus dem Apps-Script-Editor starten nach Update auf v3.
+ */
+function migrateAttendanceStatus() {
+  const ss = SpreadsheetApp.getActive();
+  initSheetsIfNeeded(ss); // legt Spalte D 'status' an falls nötig
+  const attSheet = ss.getSheetByName(ATTENDANCE_SHEET);
+  if (attSheet.getLastRow() < 2) {
+    Logger.log('Keine Anwesenheits-Eintraege vorhanden.');
+    return;
+  }
+  const data = attSheet.getRange(2, 1, attSheet.getLastRow() - 1, 4).getValues();
+  let filled = 0;
+  data.forEach((row, idx) => {
+    if (!row[3]) {
+      attSheet.getRange(idx + 2, 4).setValue('present');
+      filled++;
+    }
+  });
+  Logger.log('Status gefuellt: ' + filled + ' (insgesamt ' + data.length + ' Eintraege)');
 }
 
 /**

@@ -72,6 +72,21 @@ Im Apps-Script-Editor `rotateToken('mem-anna')` ausführen. Der alte Token wird 
 
 Der Admin trägt seine URL + Admin-Token wie bisher in den App-Einstellungen ein. Er sieht alles, kann alles korrigieren — auch Mitglieder ergänzen, die kein Smartphone haben.
 
+### 3-State Anwesenheit
+
+Jedes Mitglied hat pro Spiel drei mögliche Zustände:
+- **Dabei** (✓ grün) — Klick auf ✓-Button
+- **Nicht dabei** (✗ rot) — Klick auf ✗-Button
+- **Nicht abgestimmt** (grau, „—") — initial bzw. nach erneutem Klick auf den aktiven Button
+
+Der Admin sieht auf der Match-Detail-Seite zusätzlich „Alle dabei" und „Reset" — beides als Massenaktionen für alle Mitglieder.
+
+Im Sheet wird der Status in Spalte D (`status`) gespeichert: `present` oder `absent`. Mitglieder, die nicht abgestimmt haben, haben gar keinen Eintrag.
+
+### Migration v2 → v3
+
+Nach dem Update auf v3 muss einmal `migrateAttendanceStatus()` im Apps-Script-Editor ausgeführt werden — das ergänzt die Status-Spalte und füllt bestehende Einträge mit `present`.
+
 ## Sicherheit
 
 Es liegen keine Zugangsdaten im Code. Admins tragen den Admin-Token einmalig in den App-Einstellungen ein. Mitglieder bekommen einen personalisierten Link mit eigenem Token. Das Repository kann öffentlich sein.
