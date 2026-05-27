@@ -151,6 +151,11 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .season-empty .desc{font-size:12px;line-height:1.5}
 .member .link{background:#fff;border:1px solid #d8dae0;color:#1972c4;font-size:13px;cursor:pointer;padding:5px 9px;border-radius:8px;margin-right:4px}
 .member .link:active{background:#e8f4fd}
+.match-nav{display:flex;gap:8px;margin-bottom:12px}
+.match-nav button{flex:1;padding:10px 8px;border:1px solid #d8dae0;background:#fff;border-radius:10px;font-weight:600;font-size:12px;color:#222;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;font-family:inherit}
+.match-nav button:disabled{opacity:.35;cursor:not-allowed}
+.match-nav button:active:not(:disabled){background:#f0f1f4}
+.match-nav .sub{display:block;font-size:10px;color:#888;font-weight:500;margin-top:2px}
 .attend-row.readonly{opacity:.85;cursor:default}
 .attend-row.readonly:active{transform:none}
 .attend-row.self{border:2px solid #E32219}
@@ -234,6 +239,10 @@ body.role-member .tabbar button[data-page="members"]{display:none}
       <button class="back" onclick="ui.showPage('matches')">&larr;</button>
       <h2 id="md-title">-</h2>
       <div class="meta" id="md-meta">-</div>
+    </div>
+    <div class="match-nav">
+      <button id="nav-prev" onclick="ui.gotoMatch(-1)" disabled><span>&larr; Vorheriges<span class="sub" id="nav-prev-sub">&nbsp;</span></span></button>
+      <button id="nav-next" onclick="ui.gotoMatch(1)" disabled><span>N&auml;chstes &rarr;<span class="sub" id="nav-next-sub">&nbsp;</span></span></button>
     </div>
     <div class="card" style="padding:10px 14px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -561,11 +570,18 @@ function toast(msg){
 }
 
 // === UI ===
+let matchListScrollY = 0;
 const ui = {
+  currentMatchList: [],  // gefilterte + sortierte Match-Liste, für Vor/Zurück-Navigation
   showPage(name){
     // Mitglieder-Seite im Member-Modus blockiert (CSS versteckt den Tab,
     // dieser Guard schützt vor direkten Aufrufen)
     if(state.role === 'member' && name === 'members') name = 'matches';
+    // Beim Verlassen der Match-Liste Scroll-Position merken
+    const wasOnMatches = document.querySelector('.page.active')?.id === 'page-matches';
+    if(wasOnMatches && name !== 'matches'){
+      matchListScrollY = window.scrollY;
+    }
     $$('.page').forEach(p=>p.classList.remove('active'));
     $('#page-'+name).classList.add('active');
     $$('.tabbar button').forEach(b=>{
@@ -575,7 +591,23 @@ const ui = {
     if(name==='matches'){ ui.renderFilterChips(); ui.renderMatches(); }
     if(name==='members') ui.renderMembers();
     if(name==='stats'){ ui.renderStatChips(); ui.renderStats(); }
-    window.scrollTo(0,0);
+    // Beim Zurück zur Match-Liste vorherige Position wiederherstellen
+    if(name === 'matches'){
+      // setTimeout damit das DOM nach renderMatches gerendert ist
+      setTimeout(() => window.scrollTo(0, matchListScrollY), 0);
+    } else {
+      window.scrollTo(0,0);
+    }
+  },
+  computeCurrentMatchList(){
+    if(SCHEDULE.length===0){ ui.currentMatchList = []; return; }
+    const f = state.filter;
+    let list = SCHEDULE.slice();
+    if(COMP_TYPES.includes(f)) list = list.filter(m=>m.type===f);
+    if(f==='H') list = list.filter(m=>m.loc==='H');
+    if(f==='A') list = list.filter(m=>m.loc==='A');
+    list.sort((a,b)=>a.date.localeCompare(b.date));
+    ui.currentMatchList = list;
   },
   renderHeaderSeason(){
     const s = SEASONS.find(x=>x.id===state.seasonId);
@@ -686,12 +718,8 @@ const ui = {
       $('#matches-list').innerHTML = ui.seasonEmptyHtml();
       return;
     }
-    const f = state.filter;
-    let list = SCHEDULE.slice();
-    if(COMP_TYPES.includes(f)) list = list.filter(m=>m.type===f);
-    if(f==='H') list = list.filter(m=>m.loc==='H');
-    if(f==='A') list = list.filter(m=>m.loc==='A');
-    list.sort((a,b)=>a.date.localeCompare(b.date));
+    ui.computeCurrentMatchList();
+    const list = ui.currentMatchList;
     $('#matches-list').innerHTML = list.length>0
       ? list.map(m=>ui.matchCard(m)).join('')
       : '<div class="empty"><div class="ic">&#9917;</div>Keine Spiele in dieser Auswahl</div>';
@@ -716,11 +744,47 @@ const ui = {
     state.currentMatchId = id;
     const m = SCHEDULE.find(x=>x.id===id);
     if(!m) return;
+    // Falls computeCurrentMatchList noch nicht gelaufen ist (z.B. direkt vom Dashboard)
+    if(ui.currentMatchList.length === 0) ui.computeCurrentMatchList();
     const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
     $('#md-title').innerHTML = escapeHtml(matchTitle);
     $('#md-meta').innerHTML = `${fmtDate(m.date)} &middot; ${typeName(m.type)} &middot; ${escapeHtml(m.round)} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
+    ui.updateMatchNav(id);
     ui.renderAttendance();
     ui.showPage('match-detail');
+  },
+  updateMatchNav(matchId){
+    const list = ui.currentMatchList;
+    const idx = list.findIndex(m => m.id === matchId);
+    const prev = idx > 0 ? list[idx-1] : null;
+    const next = (idx >= 0 && idx < list.length-1) ? list[idx+1] : null;
+    const prevBtn = $('#nav-prev');
+    const nextBtn = $('#nav-next');
+    prevBtn.disabled = !prev;
+    nextBtn.disabled = !next;
+    prevBtn.dataset.id = prev ? prev.id : '';
+    nextBtn.dataset.id = next ? next.id : '';
+    const prevSub = $('#nav-prev-sub');
+    const nextSub = $('#nav-next-sub');
+    if(prev){
+      const opp = prev.opp.length > 18 ? prev.opp.slice(0,17)+'…' : prev.opp;
+      prevSub.textContent = fmtDateShort(prev.date) + ' ' + opp;
+    } else {
+      prevSub.innerHTML = '&nbsp;';
+    }
+    if(next){
+      const opp = next.opp.length > 18 ? next.opp.slice(0,17)+'…' : next.opp;
+      nextSub.textContent = fmtDateShort(next.date) + ' ' + opp;
+    } else {
+      nextSub.innerHTML = '&nbsp;';
+    }
+  },
+  gotoMatch(direction){
+    const btn = direction < 0 ? $('#nav-prev') : $('#nav-next');
+    const id = btn.dataset.id;
+    if(!id) return;
+    ui.openMatch(id);
+    window.scrollTo(0, 0);
   },
   renderAttendance(){
     const id = state.currentMatchId;
@@ -1334,6 +1398,7 @@ async function init(){
   ui.renderHeaderSeason();
   ui.renderFilterChips();
   ui.renderStatChips();
+  ui.computeCurrentMatchList(); // für Navigation in Match-Detail vorbereiten
   ui.showPage('dashboard');
   ui.updateSyncIndicator();
   const a = activeSync();
