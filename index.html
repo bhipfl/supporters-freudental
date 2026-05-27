@@ -1063,11 +1063,16 @@ const ui = {
       // keinen CORS-Header zurück, Browser blockiert. POST mit text/plain umgeht
       // sowohl Preflight als auch das GET-CORS-Problem. Leere ops-Liste ist
       // serverseitig ein reiner Pull.
+      // credentials:'omit' verhindert, dass Google-Auth-Cookies des aktuellen
+      // Browsers mitgeschickt werden - die würden Apps Script in einen Auth-Flow
+      // zwingen, der die CORS-Header verliert.
       response = await fetch(a.url, {
         method:'POST',
         body:JSON.stringify({token:a.token, userName:syncConfig.userName||state.myMemberId||'unbekannt', operations:ops}),
         headers:{'Content-Type':'text/plain;charset=utf-8'},
-        redirect:'follow'
+        redirect:'follow',
+        credentials:'omit',
+        mode:'cors'
       });
       if(!response.ok) throw new Error('HTTP ' + response.status);
       const data = await response.json();
