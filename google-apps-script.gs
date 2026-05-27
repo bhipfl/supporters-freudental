@@ -35,6 +35,12 @@ const ADMIN_TOKEN = 'GEHEIMNIS';
 // >>> URL der GitHub-Pages-App (ohne Trailing Slash) <<<
 const APP_BASE_URL = 'https://bhipfl.github.io/supporters-freudental';
 
+// >>> Web-App-URL (aus "Bereitstellen > Verwalten Bereitstellungen") <<<
+// Leer lassen, dann wird ScriptApp.getService().getUrl() verwendet (kann bei
+// mehreren Bereitstellungen die falsche URL liefern). Bei CORS-Problemen
+// die URL der aktuell aktiven Web-App hier explizit eintragen.
+const WEB_APP_EXEC_URL = '';
+
 // Tabellen-Namen
 const MEMBERS_SHEET = 'Mitglieder';
 const ATTENDANCE_SHEET = 'Anwesenheit';
@@ -393,11 +399,12 @@ function logAllMemberLinks() {
 
 /**
  * Liefert die /exec-URL der deployten Web-App.
- * ScriptApp.getService().getUrl() gibt im Editor-Kontext immer /dev zurück
- * (selbst wenn deployed) - das funktioniert nur für den Script-Besitzer.
- * Für öffentliche Links brauchen wir /exec.
+ * Wenn WEB_APP_EXEC_URL gesetzt ist, hat die Vorrang - bei mehreren
+ * Bereitstellungen ist getUrl() unzuverlässig.
+ * Sonst fällt zurück auf ScriptApp.getService().getUrl() und ersetzt /dev → /exec.
  */
 function getWebAppExecUrl() {
+  if (WEB_APP_EXEC_URL) return WEB_APP_EXEC_URL;
   let url = ScriptApp.getService().getUrl();
   if (!url) return '';
   if (url.endsWith('/dev')) url = url.slice(0, -4) + '/exec';
