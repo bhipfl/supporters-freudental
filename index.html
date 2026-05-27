@@ -149,6 +149,14 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .season-empty .ic{font-size:32px;margin-bottom:6px;opacity:.7}
 .season-empty .ttl{font-weight:700;font-size:14px;margin-bottom:4px;color:#5a4000}
 .season-empty .desc{font-size:12px;line-height:1.5}
+.attend-row.readonly{opacity:.85;cursor:default}
+.attend-row.readonly:active{transform:none}
+.attend-row.self{border:2px solid #E32219}
+.attend-row.self.on{border-color:#1f8a3a}
+.self-tag{display:inline-block;background:#E32219;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
+.attend-row.on .self-tag{background:#1f8a3a}
+body.role-member .admin-only{display:none !important}
+body.role-member .tabbar button[data-page="members"]{display:none}
 </style>
 </head>
 <body>
@@ -228,7 +236,7 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
     <div class="card" style="padding:10px 14px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <strong id="md-count">0 von 0 anwesend</strong>
-        <div style="display:flex;gap:6px">
+        <div class="admin-only" style="display:flex;gap:6px">
           <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(true)">Alle</button>
           <button class="btn btn-sec" style="padding:6px 10px;font-size:12px" onclick="ui.markAll(false)">Keiner</button>
         </div>
@@ -269,14 +277,19 @@ const SYNC_KEY = 'supporters_freudental_sync_v1';
 const PENDING_KEY = 'supporters_freudental_pending_v1';
 const SEASON_KEY = 'supporters_freudental_season_v1';
 const MIGRATION_KEY = 'supporters_freudental_migrated_v2';
+const MEMBER_AUTH_KEY = 'supporters_freudental_member_auth_v1'; // {id, token, syncUrl}
 let state = {
   members: [],         // [{id, name}]
   attendance: {},      // {matchId: [memberId, memberId, ...]}  matchId hat Saison-Prefix
   currentMatchId: null,
   seasonId: FALLBACK_SEASON_ID,
   filter: 'all',
-  statFilter: 'all'
+  statFilter: 'all',
+  role: 'guest',       // 'admin' | 'member' | 'guest' - wird im init() ermittelt
+  myMemberId: null     // nur im Member-Modus gesetzt
 };
+// Member-Auth: gesetzt sobald per URL-Hash oder localStorage erkannt
+let memberAuth = null; // {id, token, syncUrl}
 let syncConfig = {url:'', token:'', userName:'', autoSync:true};
 let pendingOps = [];     // Operationen, die noch nicht in die Cloud geschoben wurden
 let syncStatus = 'idle'; // idle | syncing | ok | error | offline
@@ -346,6 +359,62 @@ function saveSeasonChoice(){
   try{ localStorage.setItem(SEASON_KEY, state.seasonId); }catch(e){}
 }
 
+// Liest #u=...&t=...&s=... aus der URL und schreibt es in localStorage,
+// dann säubert den Hash. Returns true wenn neue Auth aufgenommen wurde.
+function captureMemberAuthFromUrl(){
+  if(!location.hash || location.hash.length < 2) return false;
+  const params = new URLSearchParams(location.hash.slice(1));
+  const u = params.get('u');
+  const t = params.get('t');
+  const s = params.get('s');
+  if(!u || !t) return false;
+  const auth = {id: u, token: t, syncUrl: s || ''};
+  try{ localStorage.setItem(MEMBER_AUTH_KEY, JSON.stringify(auth)); }catch(e){}
+  // Hash entfernen damit Token nicht im Browser-Verlauf bleibt
+  try{ history.replaceState({}, '', location.pathname + location.search); }catch(e){}
+  return true;
+}
+
+function loadMemberAuth(){
+  try{
+    const raw = localStorage.getItem(MEMBER_AUTH_KEY);
+    if(raw) memberAuth = JSON.parse(raw);
+  }catch(e){ memberAuth = null; }
+}
+
+function clearMemberAuth(){
+  memberAuth = null;
+  try{ localStorage.removeItem(MEMBER_AUTH_KEY); }catch(e){}
+}
+
+// Aktive Identität ermitteln. Member-Auth hat Vorrang vor Admin-Sync-Config.
+function detectRole(){
+  if(memberAuth && memberAuth.id && memberAuth.token){
+    state.role = 'member';
+    state.myMemberId = memberAuth.id;
+  } else if(syncConfig.url && syncConfig.token){
+    state.role = 'admin';
+    state.myMemberId = null;
+  } else {
+    state.role = 'guest';
+    state.myMemberId = null;
+  }
+}
+
+// Liefert das passende Sync-Setup für den aktuellen Modus.
+// Im Member-Modus kommt URL und Token aus der memberAuth, im Admin-Modus aus syncConfig.
+function activeSync(){
+  if(state.role === 'member' && memberAuth){
+    return {
+      url: memberAuth.syncUrl || syncConfig.url,
+      token: memberAuth.token,
+      userName: '', // wird im POST überschrieben, irrelevant
+      autoSync: true
+    };
+  }
+  return syncConfig;
+}
+
 // Lädt fixtures/index.json + alle dort referenzierten Spielpläne.
 // Match-IDs werden mit Saison-Prefix versehen (bl1 → 2526-bl1).
 async function loadFixtures(){
@@ -412,7 +481,8 @@ function savePending(){
 function queueOp(op){
   pendingOps.push(op);
   savePending();
-  if(syncConfig.url && syncConfig.autoSync){
+  const a = activeSync();
+  if(a.url && a.autoSync){
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = setTimeout(()=>ui.sync(true), 600);
   }
@@ -442,6 +512,17 @@ function applyOpLocally(op){
     } else {
       delete state.attendance[op.matchId];
     }
+  } else if(op.op === 'setSelfAttendance'){
+    // Welche memberId? Im Member-Modus ist es state.myMemberId.
+    // Im Admin-Fall (sollte selten vorkommen) wird sie aus der Op übernommen.
+    const memberId = state.role === 'member' ? state.myMemberId : op.memberId;
+    if(!memberId) return;
+    if(!state.attendance[op.matchId]) state.attendance[op.matchId] = [];
+    const arr = state.attendance[op.matchId];
+    const idx = arr.indexOf(memberId);
+    if(op.present && idx < 0) arr.push(memberId);
+    if(!op.present && idx >= 0) arr.splice(idx, 1);
+    if(arr.length === 0) delete state.attendance[op.matchId];
   }
 }
 
@@ -474,6 +555,9 @@ function toast(msg){
 // === UI ===
 const ui = {
   showPage(name){
+    // Mitglieder-Seite im Member-Modus blockiert (CSS versteckt den Tab,
+    // dieser Guard schützt vor direkten Aufrufen)
+    if(state.role === 'member' && name === 'members') name = 'matches';
     $$('.page').forEach(p=>p.classList.remove('active'));
     $('#page-'+name).classList.add('active');
     $$('.tabbar button').forEach(b=>{
@@ -487,7 +571,18 @@ const ui = {
   },
   renderHeaderSeason(){
     const s = SEASONS.find(x=>x.id===state.seasonId);
-    $('#header-season').textContent = s ? s.label : 'Saison —';
+    const seasonLabel = s ? s.label : 'Saison —';
+    if(state.role === 'member'){
+      const me = state.members.find(m => m.id === state.myMemberId);
+      const greeting = me ? `Hallo ${escapeHtml(me.name.split(' ')[0])}` : 'Mein Account';
+      $('#header-season').innerHTML = `${greeting} &middot; ${seasonLabel}`;
+    } else {
+      $('#header-season').textContent = seasonLabel;
+    }
+  },
+  applyRoleClass(){
+    document.body.classList.remove('role-admin','role-member','role-guest');
+    document.body.classList.add('role-' + state.role);
   },
   renderSeasonSelects(){
     const opts = SEASONS.map(s=>`<option value="${s.id}" ${s.id===state.seasonId?'selected':''}>${escapeHtml(s.label)}</option>`).join('');
@@ -629,27 +724,45 @@ const ui = {
       return;
     }
     const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const isMember = state.role === 'member';
     $('#attend-list').innerHTML = sorted.map(m=>{
       const on = present.includes(m.id);
-      return `<div class="attend-row ${on?'on':''}" onclick="ui.toggleAttendance('${m.id}')">
+      const isSelf = isMember && m.id === state.myMemberId;
+      const interactive = !isMember || isSelf;
+      const cls = ['attend-row'];
+      if(on) cls.push('on');
+      if(isMember && !isSelf) cls.push('readonly');
+      if(isSelf) cls.push('self');
+      const click = interactive ? `onclick="ui.toggleAttendance('${m.id}')"` : '';
+      const namePart = isSelf ? `${escapeHtml(m.name)} <span class="self-tag">du</span>` : escapeHtml(m.name);
+      return `<div class="${cls.join(' ')}" ${click}>
         <div class="avatar">${initials(m.name)}</div>
-        <div class="name">${escapeHtml(m.name)}</div>
+        <div class="name">${namePart}</div>
         <div class="check">${on?'&#10003;':''}</div>
       </div>`;
     }).join('');
   },
   toggleAttendance(memberId){
+    // Member-Modus: nur eigene Anwesenheit toggeln, andere ignorieren
+    if(state.role === 'member' && memberId !== state.myMemberId) return;
     const id = state.currentMatchId;
     if(!state.attendance[id]) state.attendance[id] = [];
     const arr = state.attendance[id];
     const idx = arr.indexOf(memberId);
+    const willBePresent = idx < 0;
     if(idx>=0) arr.splice(idx,1); else arr.push(memberId);
     if(arr.length===0) delete state.attendance[id];
     saveState();
-    queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
+    if(state.role === 'member'){
+      // Diff-basierte Op - sicher gegen Race und respektiert Server-Auth
+      queueOp({op:'setSelfAttendance', matchId:id, present:willBePresent});
+    } else {
+      queueOp({op:'setAttendance', matchId:id, memberIds:state.attendance[id]||[]});
+    }
     ui.renderAttendance();
   },
   markAll(on){
+    if(state.role === 'member') return; // im Member-Modus nicht erlaubt
     const id = state.currentMatchId;
     if(on){
       state.attendance[id] = state.members.map(m=>m.id);
@@ -678,6 +791,7 @@ const ui = {
     }).join('');
   },
   addMember(){
+    if(state.role === 'member'){ toast('Nur Admins k&ouml;nnen Mitglieder anlegen'); return; }
     const inp = $('#newMemberName');
     const name = inp.value.trim();
     if(!name){toast('Bitte Name eingeben');return}
@@ -693,6 +807,7 @@ const ui = {
     toast(name + ' hinzugef&uuml;gt');
   },
   removeMember(id){
+    if(state.role === 'member') return;
     const m = state.members.find(x=>x.id===id);
     if(!m) return;
     ui.confirm(`"${m.name}" wirklich entfernen?<br><span class="muted">Alle Anwesenheits-Eintr&auml;ge dieser Person werden ebenfalls gel&ouml;scht.</span>`, ()=>{
@@ -757,6 +872,10 @@ const ui = {
       }).join('');
   },
   showSettings(){
+    if(state.role === 'member'){
+      ui.showMemberSettings();
+      return;
+    }
     const total = state.members.length;
     const totalAtt = Object.values(state.attendance).reduce((s,a)=>s+a.length,0);
     const syncOn = !!syncConfig.url;
@@ -788,6 +907,39 @@ const ui = {
         <button class="btn btn-sec" onclick="ui.closeModal()">Schlie&szlig;en</button>
       </div>`;
     ui.openModal();
+  },
+  showMemberSettings(){
+    const me = state.members.find(m => m.id === state.myMemberId);
+    const myMatchIds = SCHEDULE.map(m=>m.id);
+    const myCount = myMatchIds.filter(id => (state.attendance[id]||[]).includes(state.myMemberId)).length;
+    const lastSyncTxt = lastSyncAt ? lastSyncAt.toLocaleString('de-DE') : 'noch nie';
+    $('#modal-content').innerHTML = `
+      <h3>Mein Account</h3>
+      <div class="status-line"><span>Name</span><strong>${escapeHtml(me ? me.name : 'unbekannt')}</strong></div>
+      <div class="status-line"><span>Aktive Saison</span><strong>${escapeHtml((SEASONS.find(s=>s.id===state.seasonId)||{}).label || '—')}</strong></div>
+      <div class="status-line"><span>Meine Spiele (Saison)</span><strong>${myCount} von ${myMatchIds.length}</strong></div>
+      <div class="status-line"><span>Letzter Sync</span><strong>${lastSyncTxt}</strong></div>
+      <div class="status-line"><span>Offene &Auml;nderungen</span><strong>${pendingOps.length}</strong></div>
+      <div style="margin-top:14px"></div>
+      <button class="btn btn-sec btn-block" onclick="ui.sync(false)">&#128260; Jetzt synchronisieren</button>
+      <hr>
+      <button class="btn btn-sec btn-block" style="color:#c33;border-color:#fcc" onclick="ui.logoutMember()">Abmelden &amp; lokale Daten l&ouml;schen</button>
+      <div class="muted" style="font-size:11px;text-align:center;margin-top:10px">
+        Du kannst dich nur f&uuml;r dich selbst eintragen.<br>
+        Korrekturen an anderen Mitgliedern macht ein Admin.
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn btn-sec" onclick="ui.closeModal()">Schlie&szlig;en</button>
+      </div>`;
+    ui.openModal();
+  },
+  logoutMember(){
+    ui.confirm('Wirklich abmelden?<br><span class="muted">Du brauchst dann erneut deinen pers&ouml;nlichen Vereins-Link, um dich wieder einzutragen.</span>', ()=>{
+      clearMemberAuth();
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+      try{ localStorage.removeItem(PENDING_KEY); }catch(e){}
+      location.reload();
+    });
   },
   showSyncSettings(){
     $('#modal-content').innerHTML = `
@@ -889,7 +1041,8 @@ const ui = {
     });
   },
   async sync(silent){
-    if(!syncConfig.url){
+    const a = activeSync();
+    if(!a.url){
       if(!silent){
         ui.closeModal();
         ui.showSyncSettings();
@@ -907,14 +1060,14 @@ const ui = {
       const ops = pendingOps.map(op => Object.assign({}, op, op.memberIds ? {memberIds: op.memberIds.slice()} : {}));
       const opsCount = ops.length;
       if(opsCount>0){
-        response = await fetch(syncConfig.url, {
+        response = await fetch(a.url, {
           method:'POST',
-          body:JSON.stringify({token:syncConfig.token, userName:syncConfig.userName||'unbekannt', operations:ops}),
+          body:JSON.stringify({token:a.token, userName:syncConfig.userName||state.myMemberId||'unbekannt', operations:ops}),
           headers:{'Content-Type':'text/plain;charset=utf-8'},
           redirect:'follow'
         });
       } else {
-        response = await fetch(syncConfig.url + (syncConfig.url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(syncConfig.token), {redirect:'follow'});
+        response = await fetch(a.url + (a.url.indexOf('?')>=0?'&':'?') + 'token=' + encodeURIComponent(a.token), {redirect:'follow'});
       }
       if(!response.ok) throw new Error('HTTP ' + response.status);
       const data = await response.json();
@@ -937,7 +1090,9 @@ const ui = {
       syncStatus = 'ok';
       lastSyncError = '';
       if(!silent && pendingOps.length===0) toast('Synchronisiert &#10003;');
-      // Aktive Seite neu rendern
+      // Aktive Seite neu rendern - Header auch, da im Member-Modus der eigene
+      // Name erst nach dem Pull bekannt ist
+      ui.renderHeaderSeason();
       const active = document.querySelector('.page.active');
       if(active){
         const name = active.id.replace('page-','');
@@ -960,7 +1115,8 @@ const ui = {
   updateSyncIndicator(){
     const pill = $('#syncPill');
     const txt = $('#syncText');
-    if(!syncConfig.url){
+    const a = activeSync();
+    if(!a.url){
       pill.className = 'sync-pill';
       txt.textContent = 'Nicht verbunden';
       return;
@@ -1125,27 +1281,32 @@ document.addEventListener('click', e=>{
 
 // === INIT ===
 async function init(){
+  captureMemberAuthFromUrl(); // URL #u=...&t=...&s=... auswerten und persistieren
+  loadMemberAuth();
   loadState();
+  detectRole();
   await loadFixtures();
+  ui.applyRoleClass();
   ui.renderSeasonSelects();
   ui.renderHeaderSeason();
   ui.renderFilterChips();
   ui.renderStatChips();
   ui.showPage('dashboard');
   ui.updateSyncIndicator();
-  if(syncConfig.url){
+  const a = activeSync();
+  if(a.url){
     setTimeout(()=>ui.sync(true), 800);
   }
 }
 init();
 // Online/Offline-Erkennung
-window.addEventListener('online', ()=>{ if(syncConfig.url) ui.sync(true); });
+window.addEventListener('online', ()=>{ if(activeSync().url) ui.sync(true); });
 window.addEventListener('offline', ()=>{
-  if(syncConfig.url){ syncStatus='offline'; ui.updateSyncIndicator(); }
+  if(activeSync().url){ syncStatus='offline'; ui.updateSyncIndicator(); }
 });
 // Beim Wiederfokussieren der App synchronisieren
 document.addEventListener('visibilitychange', ()=>{
-  if(!document.hidden && syncConfig.url){
+  if(!document.hidden && activeSync().url){
     if(!lastSyncAt || (Date.now()-lastSyncAt.getTime())>30000){
       ui.sync(true);
     }

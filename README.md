@@ -45,6 +45,35 @@ Die Spielpläne liegen als JSON-Dateien im Ordner `fixtures/`. Pro Saison eine D
 
 Während die Spiele noch nicht veröffentlicht sind, kann die Saison-Datei einfach mit leerem `matches`-Array existieren. Die App zeigt der Saison dann den Hinweis "Spielplan wird vor Saisonbeginn ergänzt".
 
+## Self-Service für Mitglieder (Phase 1)
+
+Mitglieder können sich selbst über einen persönlichen Link in der App eintragen — Admins können weiterhin alles korrigieren wie bisher.
+
+### Rollout-Reihenfolge
+
+1. **Apps Script aktualisieren:** Inhalt von `google-apps-script.gs` (v2) in den Apps-Script-Editor kopieren, `ADMIN_TOKEN` und `APP_BASE_URL` setzen, **„Bereitstellen > Verwalten > Neue Version"** ausführen. Die URL bleibt gleich.
+2. **Einmalig im Editor `migrateExistingMembers()` ausführen** — generiert Tokens für alle bestehenden Mitglieder.
+3. **`logAllMemberLinks()` ausführen** — gibt im Ausführungsprotokoll alle persönlichen Links aus.
+4. **Links per WhatsApp / Mail verteilen** an die jeweiligen Mitglieder.
+
+### Was passiert für die Mitglieder?
+
+- Mitglied tippt seinen Link an → App öffnet sich, identifiziert ihn automatisch (Token aus URL-Fragment wird in localStorage gespeichert).
+- App-Banner schlägt Installation auf Startbildschirm / Dock vor.
+- In der Match-Detail-Seite ist nur die **eigene Zeile editierbar** (rot umrandet, „du"-Badge); andere Mitglieder werden nur gezeigt, lassen sich aber nicht antippen.
+- Die Mitglieder-Verwaltungsseite und „Alle / Keiner"-Buttons sind im Member-Modus ausgeblendet.
+- Einstellungen-Modal zeigt nur „Mein Account" mit Logout-Option.
+
+### Token rotieren / neuen Link generieren
+
+Im Apps-Script-Editor `rotateToken('mem-anna')` ausführen. Der alte Token wird damit ungültig.
+
+### Admin-Modus bleibt unverändert
+
+Der Admin trägt seine URL + Admin-Token wie bisher in den App-Einstellungen ein. Er sieht alles, kann alles korrigieren — auch Mitglieder ergänzen, die kein Smartphone haben.
+
 ## Sicherheit
 
-Es liegen keine Zugangsdaten im Code. Jeder Nutzer trägt URL und Token einmalig in den App-Einstellungen ein. Das Repository kann öffentlich sein.
+Es liegen keine Zugangsdaten im Code. Admins tragen den Admin-Token einmalig in den App-Einstellungen ein. Mitglieder bekommen einen personalisierten Link mit eigenem Token. Das Repository kann öffentlich sein.
+
+Tokens stehen im Mitglieder-Tab des Sheets. Halte das Sheet privat und teile es nur mit Vertrauenswürdigen.
