@@ -76,7 +76,9 @@ header .head-actions button{background:rgba(255,255,255,.18);border:0;color:#fff
 .match-loc.h{background:#e7f6ec;color:#1f8a3a}
 .match-loc.a{background:#fef1f0;color:#b22d24}
 .match-teams{font-weight:600;font-size:15px;color:#222}
-.match-stats{margin-top:8px;padding-top:8px;border-top:1px solid #f0f1f4;font-size:12px;color:#666;display:flex;justify-content:space-between;align-items:center}
+.match-stats{margin-top:8px;padding-top:8px;border-top:1px solid #f0f1f4;font-size:12px;color:#666;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 10px}
+.match-stats-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.vote-btns.card-vote .vote{width:32px;height:32px;font-size:13px}
 .attendance-pill{background:#E32219;color:#fff;padding:3px 10px;border-radius:10px;font-weight:700;font-size:11px}
 .attendance-pill.zero{background:#d8dae0;color:#666}
 .member-list{display:flex;flex-direction:column;gap:6px}
@@ -658,6 +660,20 @@ function voteLockSinceStr(m){
 }
 function matchById(id){ return SCHEDULE.find(x=>x.id===id) || null; }
 
+// Darf der eingeloggte Member dieses Spiel direkt in der Liste abstimmen?
+// Nur Mitglieder, nur ungesperrte Spiele, und nur im Aktionsfenster:
+// kommende 4 Wochen ODER kürzlich gespielt (Lock-Saison: solange offen;
+// sonst 7-Tage-Fallback). So bleibt die Liste aufgeräumt.
+function isQuickVotable(m){
+  if(state.role !== 'member' || !state.myMemberId) return false;
+  if(isVoteLocked(m)) return false;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const md = new Date(m.date + 'T00:00:00');
+  const diff = Math.round((md - today) / 86400000); // <0 vergangen, >=0 kommend
+  if(diff >= 0) return diff <= 28;
+  return voteLockDaysForMatch(m) != null ? true : (-diff <= 7);
+}
+
 function buildMemberLinkApp(memberId, token, scriptUrl){
   return location.origin + location.pathname + '#u=' + encodeURIComponent(memberId)
     + '&t=' + encodeURIComponent(token)
@@ -931,17 +947,25 @@ const ui = {
   matchCard(m){
     const att = getPresentMembers(m.id).length;
     const matchTitle = m.loc==='H' ? `VfB Stuttgart - ${m.opp}` : `${m.opp} - VfB Stuttgart`;
-    // Eigener Vote-Status im Member-Modus: großes Icon links von HEIM/AUSW.
+    const isMember = state.role === 'member' && state.myMemberId;
+    const myStatus = isMember ? getStatus(m.id, state.myMemberId) : undefined;
+    const votable = isMember && isQuickVotable(m);
+    // Status-Icon oben nur, wenn Mitglied und NICHT votebar (votebar zeigt der Toggle unten).
     let myIcon = '';
-    if(state.role === 'member' && state.myMemberId){
-      const myStatus = getStatus(m.id, state.myMemberId);
-      if(myStatus === 'present'){
-        myIcon = '<div class="my-vote-icon my-present" title="Du bist dabei">&#10003;</div>';
-      } else if(myStatus === 'absent'){
-        myIcon = '<div class="my-vote-icon my-absent" title="Du bist nicht dabei">&#10007;</div>';
-      } else {
-        myIcon = '<div class="my-vote-icon my-open" title="Noch nicht abgestimmt">&ndash;</div>';
-      }
+    if(isMember && !votable){
+      if(myStatus === 'present') myIcon = '<div class="my-vote-icon my-present" title="Du bist dabei">&#10003;</div>';
+      else if(myStatus === 'absent') myIcon = '<div class="my-vote-icon my-absent" title="Du bist nicht dabei">&#10007;</div>';
+      else myIcon = '<div class="my-vote-icon my-open" title="Noch nicht abgestimmt">&ndash;</div>';
+    }
+    // Direkt-Toggle unten rechts (nur für votebare Spiele im Member-Modus).
+    let voteBtns = '';
+    if(votable){
+      const yes = myStatus === 'present' ? 'active' : '';
+      const no = myStatus === 'absent' ? 'active' : '';
+      voteBtns = `<div class="vote-btns card-vote">
+          <button class="vote vote-yes ${yes}" onclick="event.stopPropagation();ui.cardVote('${m.id}','present')" title="Dabei">&#10003;</button>
+          <button class="vote vote-no ${no}" onclick="event.stopPropagation();ui.cardVote('${m.id}','absent')" title="Nicht dabei">&#10007;</button>
+        </div>`;
     }
     return `<div class="match" onclick="ui.openMatch('${m.id}')">
       <div class="match-hdr">
@@ -953,9 +977,20 @@ const ui = {
       <div class="match-teams">${matchTitle}</div>
       <div class="match-stats">
         <span>${m.round}</span>
-        <span class="attendance-pill ${att===0?'zero':''}">${att} Fan${att===1?'':'s'} dabei</span>
+        <div class="match-stats-right">
+          <span class="attendance-pill ${att===0?'zero':''}">${att} Fan${att===1?'':'s'} dabei</span>
+          ${voteBtns}
+        </div>
       </div>
     </div>`;
+  },
+  // Direkt-Vote aus der Spiele-/Dashboard-Liste: nutzt die normale setVote-Logik
+  // (inkl. Sperr-/Sync-Behandlung) und rendert Liste + Dashboard neu (stilles Umfärben).
+  cardVote(matchId, action){
+    state.currentMatchId = matchId;
+    ui.setVote(state.myMemberId, action);
+    ui.renderMatches();
+    ui.renderDashboard();
   },
   openMatch(id){
     state.currentMatchId = id;
