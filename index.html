@@ -180,6 +180,31 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .attend-row.off .status-indicator{color:#c92e22}
 .self-tag{display:inline-block;background:#E32219;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;letter-spacing:.3px}
 .attend-row.on .self-tag{background:#1f8a3a}
+/* Summenzeile im Match-Detail (dabei/nicht dabei/offen) */
+#md-count{display:flex;flex-wrap:wrap;gap:3px 10px;font-size:12px;font-weight:700}
+.sum{white-space:nowrap}
+.sum-yes{color:#1f8a3a}
+.sum-no{color:#c92e22}
+.sum-open{color:#999}
+/* Abstimmsperre: Hinweis + gesperrte eigene Zeile */
+.lock-note{background:#fff4e5;border:1px solid #ffd699;color:#8a5a00;border-radius:10px;padding:10px 12px;font-size:12.5px;font-weight:600;margin-bottom:8px}
+.attend-row.self.locked{border-color:#d8dae0;opacity:.9}
+/* "Nächstes Spiel"-Hero auf dem Dashboard */
+.hero-match{background:linear-gradient(135deg,#E32219 0%,#9e1610 100%);color:#fff;border-radius:14px;padding:14px 16px;margin-bottom:12px;cursor:pointer;box-shadow:0 3px 10px rgba(227,34,25,.25)}
+.hero-match:active{transform:scale(.995)}
+.hero-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.hero-countdown{background:rgba(255,255,255,.2);color:#fff;font-size:11px;font-weight:800;padding:3px 9px;border-radius:9px;text-transform:uppercase;letter-spacing:.4px}
+.hero-loc{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.18);color:#fff}
+.hero-teams{font-size:18px;font-weight:800;line-height:1.2}
+.hero-meta{font-size:12px;opacity:.9;margin-top:3px}
+.hero-counts{display:flex;flex-wrap:wrap;gap:3px 12px;margin-top:10px;font-size:12px;font-weight:700}
+.hero-counts .sum{color:#fff;opacity:.95}
+.hero-vote{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.2)}
+.hero-vote-lbl{font-size:13px;font-weight:700}
+.hero-vote .vote-btns{margin-left:auto}
+.hero-vote .vote{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.55);color:#fff}
+.hero-vote .vote-yes.active{background:#fff;border-color:#fff;color:#1f8a3a}
+.hero-vote .vote-no.active{background:#fff;border-color:#fff;color:#c92e22}
 body.role-member .admin-only{display:none !important}
 body.role-member .tabbar button[data-page="members"]{display:none}
 </style>
@@ -210,6 +235,8 @@ body.role-member .tabbar button[data-page="members"]{display:none}
       <div class="stat"><div class="v" id="stat-games-done">0</div><div class="l">Erfasste Spiele</div></div>
       <div class="stat"><div class="v" id="stat-avg">0</div><div class="l">&Oslash; Besucher</div></div>
     </div>
+
+    <div id="next-match-hero"></div>
 
     <div class="card">
       <h2>N&auml;chste Spiele</h2>
@@ -593,6 +620,43 @@ function ensureAttendanceObject(matchId){
   if(!cur) state.attendance[matchId] = {};
   else if(Array.isArray(cur)) state.attendance[matchId] = attendanceArrayToObject(cur);
 }
+// Zählt für ein Match die Stati über alle Mitglieder: {present, absent, open}.
+function getStatusCounts(matchId){
+  let present = 0, absent = 0;
+  state.members.forEach(mem => {
+    const s = getStatus(matchId, mem.id);
+    if(s === 'present') present++;
+    else if(s === 'absent') absent++;
+  });
+  return {present, absent, open: state.members.length - present - absent};
+}
+
+// --- Abstimmsperre: Mitglieder können nur bis voteLockDays Tage nach dem Spiel
+// selbst abstimmen (gilt je Saison, konfiguriert in fixtures/index.json). Admins
+// sind ausgenommen (Bypass an den Aufrufstellen). Rein client-seitig. ---
+function seasonMetaById(seasonId){ return SEASONS.find(s=>s.id===seasonId) || {}; }
+function voteLockDaysForMatch(m){
+  const seasonId = String(m.id).split('-')[0];
+  const d = seasonMetaById(seasonId).voteLockDays;
+  return (typeof d === 'number' && d > 0) ? d : null;
+}
+// Gesperrt, wenn jetzt > Spieltag + lockDays (Ende des Tages).
+function isVoteLocked(m){
+  const days = voteLockDaysForMatch(m);
+  if(days == null) return false;
+  const deadline = new Date(m.date + 'T23:59:59');
+  deadline.setDate(deadline.getDate() + days);
+  return Date.now() > deadline.getTime();
+}
+// Datum, ab dem gesperrt ist (Spieltag + lockDays + 1) - für den Hinweistext.
+function voteLockSinceStr(m){
+  const days = voteLockDaysForMatch(m);
+  if(days == null) return '';
+  const d = new Date(m.date + 'T00:00:00');
+  d.setDate(d.getDate() + days + 1);
+  return d.toLocaleDateString('de-DE');
+}
+function matchById(id){ return SCHEDULE.find(x=>x.id===id) || null; }
 
 function buildMemberLinkApp(memberId, token, scriptUrl){
   return location.origin + location.pathname + '#u=' + encodeURIComponent(memberId)
@@ -760,6 +824,8 @@ const ui = {
     const totalAtt = matchIds.reduce((s,id) => s + getPresentMembers(id).length, 0);
     $('#stat-avg').textContent = done>0 ? (totalAtt/done).toFixed(1) : '0';
 
+    ui.renderNextMatchHero();
+
     // Upcoming - next 5 matches >= today
     if(SCHEDULE.length===0){
       $('#upcoming-list').innerHTML = ui.seasonEmptyHtml();
@@ -793,6 +859,56 @@ const ui = {
         </div>`;
       }).join('');
     }
+  },
+  // Prominentes "Nächstes Spiel" mit Countdown, Stimmen-Summen und (für Mitglieder)
+  // Quick-Vote ohne Drilldown. Hilft, vor dem Spiel zu planen (Fahrgemeinschaften etc.).
+  renderNextMatchHero(){
+    const host = $('#next-match-hero');
+    if(!host) return;
+    if(SCHEDULE.length===0){ host.innerHTML = ''; return; }
+    const todayStr = new Date().toISOString().slice(0,10);
+    const next = SCHEDULE.filter(m=>m.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date))[0];
+    if(!next){ host.innerHTML = ''; return; }
+    const today = new Date(); today.setHours(0,0,0,0);
+    const md = new Date(next.date + 'T00:00:00');
+    const diffDays = Math.round((md - today) / 86400000);
+    const countdown = diffDays <= 0 ? 'Heute' : diffDays === 1 ? 'Morgen' : 'in ' + diffDays + ' Tagen';
+    const matchTitle = next.loc==='H' ? `VfB Stuttgart - ${next.opp}` : `${next.opp} - VfB Stuttgart`;
+    const c = getStatusCounts(next.id);
+    const countsHtml = `<div class="hero-counts">
+        <span class="sum sum-yes">&#10003; ${c.present} dabei</span>
+        <span class="sum sum-no">&#10007; ${c.absent} nicht dabei</span>
+        <span class="sum sum-open">&ndash; ${c.open} offen</span>
+      </div>`;
+    let voteHtml = '';
+    if(state.role === 'member' && state.myMemberId){
+      const st = getStatus(next.id, state.myMemberId);
+      voteHtml = `<div class="hero-vote">
+        <span class="hero-vote-lbl">Bist du dabei?</span>
+        <div class="vote-btns">
+          <button class="vote vote-yes ${st==='present'?'active':''}" onclick="event.stopPropagation();ui.quickVote('${next.id}','present')" title="Dabei">&#10003;</button>
+          <button class="vote vote-no ${st==='absent'?'active':''}" onclick="event.stopPropagation();ui.quickVote('${next.id}','absent')" title="Nicht dabei">&#10007;</button>
+        </div>
+      </div>`;
+    }
+    host.innerHTML = `<div class="hero-match ${next.loc==='H'?'h':'a'}" onclick="ui.openMatch('${next.id}')">
+      <div class="hero-top">
+        <span class="hero-countdown">${countdown}</span>
+        <span class="match-badge ${typeBadge(next.type)}">${typeName(next.type)}</span>
+        <span class="hero-loc ${next.loc==='H'?'h':'a'}">${next.loc==='H'?'HEIM':'AUSW.'}</span>
+      </div>
+      <div class="hero-teams">${escapeHtml(matchTitle)}</div>
+      <div class="hero-meta">${fmtDateShort(next.date)} &middot; ${escapeHtml(next.round||'')}</div>
+      ${countsHtml}
+      ${voteHtml}
+    </div>`;
+  },
+  // Quick-Vote vom Dashboard-Hero: setzt currentMatchId und nutzt die normale
+  // setVote-Logik (inkl. Sperr-/Sync-Behandlung), danach Hero aktualisieren.
+  quickVote(matchId, action){
+    state.currentMatchId = matchId;
+    ui.setVote(state.myMemberId, action);
+    ui.renderNextMatchHero();
   },
   seasonEmptyHtml(){
     return `<div class="season-empty">
@@ -890,23 +1006,32 @@ const ui = {
   renderAttendance(){
     const id = state.currentMatchId;
     const total = state.members.length;
-    const presentCount = getPresentMembers(id).length;
-    $('#md-count').textContent = `${presentCount} von ${total} anwesend`;
+    const c = getStatusCounts(id);
+    // Summenzeile: dabei / nicht dabei / offen (für Auswärts-Planung)
+    $('#md-count').innerHTML = `<span class="sum sum-yes">&#10003; ${c.present} dabei</span>`
+      + `<span class="sum sum-no">&#10007; ${c.absent} nicht dabei</span>`
+      + `<span class="sum sum-open">&ndash; ${c.open} offen</span>`;
     if(total===0){
       $('#attend-list').innerHTML = '<div class="empty"><div class="ic">&#128101;</div>Bitte zuerst Mitglieder auf der Mitglieder-Seite anlegen.</div>';
       return;
     }
-    const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    const match = matchById(id);
     const isMember = state.role === 'member';
-    $('#attend-list').innerHTML = sorted.map(m=>{
+    const locked = isMember && match && isVoteLocked(match);
+    const lockBanner = locked
+      ? `<div class="lock-note">&#128274; Abstimmung seit ${voteLockSinceStr(match)} geschlossen. Korrekturen macht ein Admin.</div>`
+      : '';
+    const sorted = state.members.slice().sort((a,b)=>a.name.localeCompare(b.name,'de'));
+    $('#attend-list').innerHTML = lockBanner + sorted.map(m=>{
       const status = getStatus(id, m.id);
       const isSelf = isMember && m.id === state.myMemberId;
-      const interactive = !isMember || isSelf;
+      const interactive = (!isMember || isSelf) && !locked;
       const cls = ['attend-row', 'attend-row-3state'];
       if(status === 'present') cls.push('on');
       if(status === 'absent') cls.push('off');
       if(isMember && !isSelf) cls.push('readonly');
       if(isSelf) cls.push('self');
+      if(isSelf && locked) cls.push('locked');
       const namePart = isSelf ? `${escapeHtml(m.name)} <span class="self-tag">du</span>` : escapeHtml(m.name);
       const presentActive = status === 'present' ? 'active' : '';
       const absentActive = status === 'absent' ? 'active' : '';
@@ -928,6 +1053,12 @@ const ui = {
     // Member-Modus: nur eigene Anwesenheit, andere ignorieren
     if(state.role === 'member' && memberId !== state.myMemberId) return;
     const id = state.currentMatchId;
+    // Abstimmsperre: Mitglieder können nach Ablauf des Fensters nicht mehr ändern
+    const lm = matchById(id);
+    if(state.role === 'member' && lm && isVoteLocked(lm)){
+      toast('Abstimmung für dieses Spiel ist geschlossen (mehr als ' + voteLockDaysForMatch(lm) + ' Tage her). Ein Admin kann nachtragen.');
+      return;
+    }
     const currentStatus = getStatus(id, memberId);
     // Nochmal auf den aktiven Button = zurück auf "nicht abgestimmt"
     const newStatus = currentStatus === action ? null : action;

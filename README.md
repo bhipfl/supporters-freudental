@@ -8,6 +8,8 @@ Erfasst pro Pflichtspiel, welche Mitglieder im Stadion waren. Synchronisiert üb
 
 - Spielpläne pro Saison auswählbar (aktuell: 2025/26, vorbereitet: 2026/27)
 - Pflichtspiele aus Supercup, Bundesliga, DFB-Pokal sowie Champions / Europa League
+- Spieltag-Übersicht: prominentes „Nächstes Spiel" mit Countdown und Schnell-Abstimmung
+- Abstimmsperre: Mitglieder tragen sich nur bis 7 Tage nach dem Spiel selbst ein (ab Saison 2026/27); Admins jederzeit
 - Touchoptimierte Oberfläche für mobiles Erfassen am Spieltag
 - Auswertungen: Heim/Auswärts getrennt, Anwesenheitsquote, Top-Treueranking pro Wettbewerb
 - Offline-fähig (Service Worker), synchronisiert automatisch bei Internetverbindung
@@ -37,7 +39,7 @@ Die Spielpläne liegen als JSON-Dateien im Ordner `fixtures/`. Pro Saison eine D
    - `id` muss innerhalb der Saison eindeutig sein (Konvention: `bl1`…`bl34`, `dfb1`…, `cl1`/`el1`…, `sc1`)
    - `type`: `BL` (Bundesliga), `DFB` (DFB-Pokal), `CL` (Champions League), `EL` (Europa League), `SC` (Supercup)
    - `loc`: `H` (Heim) oder `A` (Auswärts)
-2. In `fixtures/index.json` das `current`-Flag der neuen Saison auf `true` setzen und bei der alten auf `false`.
+2. In `fixtures/index.json` das `current`-Flag der neuen Saison auf `true` setzen und bei der alten auf `false`. Bei neuen Saisons das Feld `"voteLockDays": 7` setzen (Abstimmsperre, siehe unten).
 3. `sw.js`: Den Wert `CACHE_NAME` um eine Version hochzählen (z. B. `v3` → `v4`), damit alle Nutzer die neue Datei beim nächsten Öffnen bekommen.
 4. Commit – fertig. Die App zeigt die neue Saison automatisch im Dropdown.
 
@@ -82,6 +84,23 @@ Jedes Mitglied hat pro Spiel drei mögliche Zustände:
 Der Admin sieht auf der Match-Detail-Seite zusätzlich „Alle dabei" und „Reset" — beides als Massenaktionen für alle Mitglieder.
 
 Im Sheet wird der Status in Spalte D (`status`) gespeichert: `present` oder `absent`. Mitglieder, die nicht abgestimmt haben, haben gar keinen Eintrag.
+
+### Abstimmsperre (7 Tage, ab Saison 26/27)
+
+Damit niemand Wochen später seine Statistik aufhübscht, können sich **Mitglieder nur bis
+`voteLockDays` Tage nach dem Spiel** selbst eintragen. Danach sind ihre Vote-Buttons gesperrt
+(Hinweis „🔒 Abstimmung seit … geschlossen"). **Admins bleiben uneingeschränkt** und können
+jederzeit nachtragen/korrigieren.
+
+- Konfiguriert pro Saison in `fixtures/index.json` über das Feld `"voteLockDays": 7`.
+- Ohne das Feld (z. B. Saison 2025/26) gibt es **keine** Sperre — nützlich für laufende Saisons,
+  die noch komplett nachgetragen werden.
+- Tag 0 bis einschließlich Tag 7 nach dem Spiel sind offen; ab Tag 8 ist gesperrt. Vor dem Spiel
+  (Vorab-Abstimmung „Wer kommt mit?") ist immer erlaubt.
+- **Rein client-seitig** umgesetzt (App-Oberfläche). Das Apps Script muss dafür nicht angefasst
+  werden. Für die meisten Fanclub-Szenarien ausreichend; eine technisch versierte Person könnte
+  die reine UI-Sperre theoretisch umgehen (z. B. Gerätedatum). Eine serverseitige Erzwingung wäre
+  möglich (Apps Script lädt Termine via `APP_BASE_URL`), ist aber bewusst nicht umgesetzt.
 
 ### Migration v2 → v3
 

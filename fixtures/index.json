@@ -1,6 +1,6 @@
 {
   "seasons": [
     { "id": "2526", "label": "Saison 2025/26", "file": "fixtures/2025-26.json", "current": true },
-    { "id": "2627", "label": "Saison 2026/27", "file": "fixtures/2026-27.json", "current": false }
+    { "id": "2627", "label": "Saison 2026/27", "file": "fixtures/2026-27.json", "current": false, "voteLockDays": 7 }
   ]
 }
