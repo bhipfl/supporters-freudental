@@ -1089,18 +1089,31 @@ const ui = {
         queueOp({op:'setSelfAttendance', matchId:id, memberId:m.id, present:true});
       });
       toast('Alle als anwesend markiert');
+      saveState();
+      ui.renderAttendance();
     } else if(action === 'reset'){
-      const existing = state.attendance[id];
-      if(existing && typeof existing === 'object' && !Array.isArray(existing)){
-        Object.keys(existing).forEach(memberId => {
+      ui.resetMatch(id);
+    }
+  },
+  // Setzt alle Stimmen eines Spiels zurück - mit Sicherheitsabfrage, da destruktiv.
+  resetMatch(id){
+    const existing = state.attendance[id];
+    const count = (existing && typeof existing === 'object' && !Array.isArray(existing))
+      ? Object.keys(existing).length
+      : (Array.isArray(existing) ? existing.length : 0);
+    if(count === 0){ toast('Nichts zur&uuml;ckzusetzen'); return; }
+    ui.confirm(`<strong>Alle Stimmen dieses Spiels zur&uuml;cksetzen?</strong><br>${count} Eintr&auml;ge (dabei/nicht dabei) werden gel&ouml;scht und auf &bdquo;nicht abgestimmt&ldquo; gesetzt.`, ()=>{
+      const cur = state.attendance[id];
+      if(cur && typeof cur === 'object' && !Array.isArray(cur)){
+        Object.keys(cur).forEach(memberId => {
           queueOp({op:'setSelfAttendance', matchId:id, memberId, clear:true});
         });
       }
       delete state.attendance[id];
+      saveState();
+      ui.renderAttendance();
       toast('Zur&uuml;ckgesetzt');
-    }
-    saveState();
-    ui.renderAttendance();
+    });
   },
   renderMembers(){
     if(state.members.length===0){
