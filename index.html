@@ -536,8 +536,14 @@ async function loadFixtures(){
         SCHEDULES[s.id] = [];
       }
     }));
-    // Gewählte Saison auf gültigen Wert sicherstellen
-    if(!SEASONS.some(s=>s.id===state.seasonId)){
+    // Saison bestimmen: eine EXPLIZIT vom Nutzer gewählte Saison (SEASON_KEY)
+    // hat Vorrang; sonst die als "current" markierte Saison (z.B. bei neuem
+    // Spielplan), sonst die erste. So landen neue/nicht-wählende Nutzer
+    // automatisch in der aktuellen Saison statt im hart kodierten Fallback.
+    let storedSeason = null;
+    try{ storedSeason = localStorage.getItem(SEASON_KEY); }catch(e){}
+    const hasValidChoice = storedSeason && SEASONS.some(s=>s.id===storedSeason);
+    if(!hasValidChoice){
       const cur = SEASONS.find(s=>s.current) || SEASONS[0];
       if(cur) state.seasonId = cur.id;
     }
