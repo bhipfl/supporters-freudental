@@ -10,6 +10,7 @@ Erfasst pro Pflichtspiel, welche Mitglieder im Stadion waren. Synchronisiert üb
 - Pflichtspiele aus Supercup, Bundesliga, DFB-Pokal sowie Champions / Europa League
 - Spieltag-Übersicht: prominentes „Nächstes Spiel" mit Countdown und Schnell-Abstimmung
 - Abstimmsperre: Mitglieder tragen sich nur bis 7 Tage nach dem Spiel selbst ein (ab Saison 2026/27); Admins jederzeit
+- Ticketabfragen: Admin startet pro Spiel eine Bedarfsabfrage („Ich nehme ein Ticket"), schließt sie und friert die Liste ein (eigener Tab „Tickets")
 - Touchoptimierte Oberfläche für mobiles Erfassen am Spieltag
 - Auswertungen: Heim/Auswärts getrennt, Anwesenheitsquote, Top-Treueranking pro Wettbewerb
 - Offline-fähig (Service Worker), synchronisiert automatisch bei Internetverbindung
@@ -101,6 +102,24 @@ jederzeit nachtragen/korrigieren.
   werden. Für die meisten Fanclub-Szenarien ausreichend; eine technisch versierte Person könnte
   die reine UI-Sperre theoretisch umgehen (z. B. Gerätedatum). Eine serverseitige Erzwingung wäre
   möglich (Apps Script lädt Termine via `APP_BASE_URL`), ist aber bewusst nicht umgesetzt.
+
+### Ticketabfragen
+
+Der Fanclub bestellt beim VfB Tickets als Kontingent. Über den Tab **„Tickets" 🎫** lässt sich pro
+Spiel abfragen, **wer eine Karte nehmen würde**, falls genug zugeteilt werden.
+
+- **Admin startet/schließt/öffnet** eine Abfrage **im Spiel-Detail** (ein zustandsabhängiger Button).
+- **Mitglieder** melden im Tickets-Tab mit einem Toggle **„Ich nehme ein Ticket"** ihren Bedarf.
+  Ein kleiner **roter Punkt am Tab** signalisiert eine neue, noch nicht angesehene Abfrage.
+- **Schließen friert die Liste ein** — danach sind keine Änderungen durch Mitglieder mehr möglich
+  (serverseitig erzwungen). Geschlossene Abfragen bleiben als **Archiv** unter „Abgeschlossen".
+- Funktioniert für **alle** Spiele (nicht nur Auswärts) und **saison-übergreifend**.
+
+Backend: zwei Sheets `Ticketumfrage` und `Ticketinteresse` (werden automatisch angelegt) sowie die
+Operationen `openTicketSurvey` / `closeTicketSurvey` / `deleteTicketSurvey` / `setTicketInterest`.
+**Wichtig:** Für den synchronisierten Betrieb muss der aktualisierte `google-apps-script.gs` einmal
+neu bereitgestellt werden (**„Bereitstellen > Verwalten > Neue Version"**; URL bleibt gleich). Ohne
+Neu-Bereitstellung funktioniert das Feature nur lokal/offline pro Gerät.
 
 ### Migration v2 → v3
 

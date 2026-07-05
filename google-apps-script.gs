@@ -45,6 +45,8 @@ const WEB_APP_EXEC_URL = '';
 const MEMBERS_SHEET = 'Mitglieder';
 const ATTENDANCE_SHEET = 'Anwesenheit';
 const AUDIT_SHEET = 'Verlauf';
+const TICKET_SURVEY_SHEET = 'Ticketumfrage';     // matchId | status | openedAt | closedAt
+const TICKET_INTEREST_SHEET = 'Ticketinteresse'; // matchId | memberId | createdAt
 
 // ===================================================================
 // HTTP-Endpoints
@@ -157,7 +159,33 @@ function getCurrentState(includeTokens) {
     });
   }
 
-  return {members: members, attendance: attendance, syncedAt: new Date().toISOString()};
+  // Ticketabfragen: tickets[matchId] = {status, openedAt, closedAt, interested:{memberId:true}}
+  const tickets = {};
+  const surveySheet = ss.getSheetByName(TICKET_SURVEY_SHEET);
+  const interestSheet = ss.getSheetByName(TICKET_INTEREST_SHEET);
+  if (surveySheet && surveySheet.getLastRow() > 1) {
+    const sData = surveySheet.getRange(2, 1, surveySheet.getLastRow() - 1, 4).getValues();
+    sData.forEach(row => {
+      const matchId = String(row[0] || '');
+      if (!matchId) return;
+      tickets[matchId] = {
+        status: String(row[1] || 'open') === 'closed' ? 'closed' : 'open',
+        openedAt: row[2] ? new Date(row[2]).toISOString() : null,
+        closedAt: row[3] ? new Date(row[3]).toISOString() : null,
+        interested: {}
+      };
+    });
+  }
+  if (interestSheet && interestSheet.getLastRow() > 1) {
+    const iData = interestSheet.getRange(2, 1, interestSheet.getLastRow() - 1, 2).getValues();
+    iData.forEach(row => {
+      const matchId = String(row[0] || '');
+      const memberId = String(row[1] || '');
+      if (matchId && memberId && tickets[matchId]) tickets[matchId].interested[memberId] = true;
+    });
+  }
+
+  return {members: members, attendance: attendance, tickets: tickets, syncedAt: new Date().toISOString()};
 }
 
 // ===================================================================
@@ -170,6 +198,8 @@ function applyOperations(ops, userName, auth) {
   const memSheet = ss.getSheetByName(MEMBERS_SHEET);
   const attSheet = ss.getSheetByName(ATTENDANCE_SHEET);
   const audSheet = ss.getSheetByName(AUDIT_SHEET);
+  const surveySheet = ss.getSheetByName(TICKET_SURVEY_SHEET);
+  const interestSheet = ss.getSheetByName(TICKET_INTEREST_SHEET);
   const now = new Date();
   let applied = 0;
 
@@ -237,6 +267,74 @@ function applyOperations(ops, userName, auth) {
       }
       applied++;
     }
+
+    // ---- TICKETABFRAGEN ----
+    // Admin: Abfrage starten / wieder öffnen (Zeile upserten -> status=open)
+    else if (op.op === 'openTicketSurvey') {
+      if (auth.role !== 'admin') return;
+      const matchId = String(op.matchId || '');
+      if (!matchId) return;
+      const row = findTicketSurveyRow(surveySheet, matchId);
+      if (row > 0) {
+        surveySheet.getRange(row, 2).setValue('open');
+        surveySheet.getRange(row, 4).setValue(''); // closedAt leeren
+      } else {
+        surveySheet.appendRow([matchId, 'open', now, '']);
+      }
+      audSheet.appendRow([now, userName, 'openTicketSurvey', 'Spiel ' + matchId]);
+      applied++;
+    }
+
+    // Admin: Abfrage schließen (einfrieren)
+    else if (op.op === 'closeTicketSurvey') {
+      if (auth.role !== 'admin') return;
+      const matchId = String(op.matchId || '');
+      if (!matchId) return;
+      const row = findTicketSurveyRow(surveySheet, matchId);
+      if (row > 0) {
+        surveySheet.getRange(row, 2).setValue('closed');
+        surveySheet.getRange(row, 4).setValue(now);
+        audSheet.appendRow([now, userName, 'closeTicketSurvey', 'Spiel ' + matchId]);
+      }
+      applied++;
+    }
+
+    // Admin: Abfrage komplett löschen (Umfrage + alle Interessen)
+    else if (op.op === 'deleteTicketSurvey') {
+      if (auth.role !== 'admin') return;
+      const matchId = String(op.matchId || '');
+      if (!matchId) return;
+      const row = findTicketSurveyRow(surveySheet, matchId);
+      if (row > 0) surveySheet.deleteRow(row);
+      removeTicketInterestForMatch(interestSheet, matchId);
+      audSheet.appendRow([now, userName, 'deleteTicketSurvey', 'Spiel ' + matchId]);
+      applied++;
+    }
+
+    // Member (auch Admin): eigenes Ticket-Interesse setzen/entfernen.
+    // memberId kommt bei Mitgliedern AUS DEM TOKEN. Nur wenn die Abfrage
+    // OFFEN ist - nach dem Schließen serverseitig abgelehnt (eingefroren).
+    else if (op.op === 'setTicketInterest') {
+      const memberId = (auth.role === 'member') ? auth.memberId : String(op.memberId || '');
+      if (!memberId) return;
+      const matchId = String(op.matchId || '');
+      if (!matchId) return;
+      const survey = findTicketSurveyRow(surveySheet, matchId);
+      if (survey < 0) return; // keine Abfrage vorhanden
+      const status = String(surveySheet.getRange(survey, 2).getValue() || 'open');
+      if (status !== 'open') return; // eingefroren -> nicht änderbar
+      const wants = op.interested === true;
+      const existing = findTicketInterestRow(interestSheet, matchId, memberId);
+      if (wants && existing < 0) {
+        interestSheet.appendRow([matchId, memberId, now]);
+      } else if (!wants && existing > 0) {
+        interestSheet.deleteRow(existing);
+      }
+      const tag = (auth.role === 'member') ? 'self' : 'admin-as-' + memberId;
+      audSheet.appendRow([now, userName + ' (' + tag + ')', 'setTicketInterest',
+        'Spiel ' + matchId + ': ' + memberId + ' = ' + (wants ? 'will Ticket' : 'kein Ticket')]);
+      applied++;
+    }
   });
 
   return applied;
@@ -271,6 +369,34 @@ function removeMatchEntriesForMember(attSheet, memberId) {
   const data = attSheet.getRange(2, 1, attSheet.getLastRow() - 1, 2).getValues();
   for (let i = data.length - 1; i >= 0; i--) {
     if (String(data[i][1]) === String(memberId)) attSheet.deleteRow(i + 2);
+  }
+}
+
+function findTicketSurveyRow(surveySheet, matchId) {
+  if (!surveySheet || surveySheet.getLastRow() < 2) return -1;
+  const data = surveySheet.getRange(2, 1, surveySheet.getLastRow() - 1, 1).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(matchId)) return i + 2;
+  }
+  return -1;
+}
+
+function findTicketInterestRow(interestSheet, matchId, memberId) {
+  if (!interestSheet || interestSheet.getLastRow() < 2) return -1;
+  const data = interestSheet.getRange(2, 1, interestSheet.getLastRow() - 1, 2).getValues();
+  for (let i = 0; i < data.length; i++) {
+    if (String(data[i][0]) === String(matchId) && String(data[i][1]) === String(memberId)) {
+      return i + 2;
+    }
+  }
+  return -1;
+}
+
+function removeTicketInterestForMatch(interestSheet, matchId) {
+  if (!interestSheet || interestSheet.getLastRow() < 2) return;
+  const data = interestSheet.getRange(2, 1, interestSheet.getLastRow() - 1, 1).getValues();
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (String(data[i][0]) === String(matchId)) interestSheet.deleteRow(i + 2);
   }
 }
 
@@ -359,6 +485,25 @@ function initSheetsIfNeeded(ss) {
     s.setColumnWidth(2, 180);
     s.setColumnWidth(3, 160);
     s.setColumnWidth(4, 360);
+  }
+  if (!ss.getSheetByName(TICKET_SURVEY_SHEET)) {
+    const s = ss.insertSheet(TICKET_SURVEY_SHEET);
+    s.appendRow(['matchId', 'status', 'openedAt', 'closedAt']);
+    s.setFrozenRows(1);
+    s.getRange('A1:D1').setFontWeight('bold').setBackground('#E32219').setFontColor('#fff');
+    s.setColumnWidth(1, 130);
+    s.setColumnWidth(2, 90);
+    s.setColumnWidth(3, 160);
+    s.setColumnWidth(4, 160);
+  }
+  if (!ss.getSheetByName(TICKET_INTEREST_SHEET)) {
+    const s = ss.insertSheet(TICKET_INTEREST_SHEET);
+    s.appendRow(['matchId', 'memberId', 'createdAt']);
+    s.setFrozenRows(1);
+    s.getRange('A1:C1').setFontWeight('bold').setBackground('#E32219').setFontColor('#fff');
+    s.setColumnWidth(1, 130);
+    s.setColumnWidth(2, 180);
+    s.setColumnWidth(3, 160);
   }
 }
 

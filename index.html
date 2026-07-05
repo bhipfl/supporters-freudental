@@ -207,6 +207,36 @@ hr{border:0;border-top:1px solid #f0f1f4;margin:10px 0}
 .hero-vote .vote{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.55);color:#fff}
 .hero-vote .vote-yes.active{background:#fff;border-color:#fff;color:#1f8a3a}
 .hero-vote .vote-no.active{background:#fff;border-color:#fff;color:#c92e22}
+/* Tickets-Tab: Benachrichtigungs-Punkt am Icon */
+.tabbar button .ic{position:relative}
+.tab-dot{position:absolute;top:-2px;right:-7px;width:9px;height:9px;border-radius:50%;background:#E32219;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.03)}
+.tab-dot[hidden]{display:none}
+/* Ticketabfragen (Tickets-Tab) */
+.ticket-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ticket-date{margin-left:auto;font-size:11px;color:#888;font-weight:600}
+.ticket-teams{font-weight:700;font-size:16px;color:#222;margin-bottom:6px}
+.ticket-count{font-size:13px;color:#555;font-weight:600}
+.ticket-count-n{color:#E32219;font-weight:800;font-size:15px}
+.ticket-names{font-size:12px;color:#666;margin:6px 0 12px;line-height:1.5}
+.ticket-names.muted{color:#aaa}
+.ticket-card.frozen{opacity:.92;background:#fafbfc}
+.ticket-toggle{width:100%;padding:12px;border-radius:10px;border:2px solid #1f8a3a;background:#fff;color:#1f8a3a;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:.15s}
+.ticket-toggle.on{background:#1f8a3a;color:#fff}
+.ticket-toggle:active{transform:scale(.99)}
+.ticket-frozen-note{font-size:12.5px;color:#8a5a00;background:#fff4e5;border:1px solid #ffd699;border-radius:10px;padding:9px 12px;font-weight:600}
+.ticket-admin-actions{display:flex;gap:8px}
+.ticket-admin-actions .btn{flex:1;padding:9px 10px;font-size:13px}
+.ticket-del{color:#c33;border-color:#f0c0bc}
+/* Ticket-Steuerung im Spiel-Detail */
+#md-ticket:empty{display:none}
+#md-ticket{margin-bottom:12px}
+.md-ticket-bar{display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:10px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.md-ticket-bar.open{border-left:4px solid #1f8a3a}
+.md-ticket-bar.closed{border-left:4px solid #999}
+.md-ticket-info{display:flex;flex-direction:column;gap:1px;margin-right:auto}
+.md-ticket-lbl{font-size:13px;font-weight:700;color:#222}
+.md-ticket-n{font-size:11px;color:#888;font-weight:600}
+.md-ticket-bar .btn{padding:7px 12px;font-size:12px;white-space:nowrap}
 body.role-member .admin-only{display:none !important}
 body.role-member .tabbar button[data-page="members"]{display:none}
 </style>
@@ -280,6 +310,11 @@ body.role-member .tabbar button[data-page="members"]{display:none}
     <div id="ranking-list"></div>
   </div>
 
+  <!-- Tickets / Ticketabfragen -->
+  <div class="page" id="page-tickets">
+    <div id="tickets-list"></div>
+  </div>
+
   <!-- Spieldetail -->
   <div class="page" id="page-match-detail">
     <div class="detail-hdr">
@@ -300,6 +335,7 @@ body.role-member .tabbar button[data-page="members"]{display:none}
         </div>
       </div>
     </div>
+    <div class="admin-only" id="md-ticket"></div>
     <div id="attend-list"></div>
   </div>
 
@@ -309,6 +345,7 @@ body.role-member .tabbar button[data-page="members"]{display:none}
   <button class="active" data-page="dashboard"><span class="ic">&#127968;</span><span>Start</span></button>
   <button data-page="matches"><span class="ic">&#9917;</span><span>Spiele</span></button>
   <button data-page="members"><span class="ic">&#128101;</span><span>Mitglieder</span></button>
+  <button data-page="tickets"><span class="ic">&#127915;<span class="tab-dot" id="ticketTabDot" hidden></span></span><span>Tickets</span></button>
   <button data-page="stats"><span class="ic">&#128202;</span><span>Statistik</span></button>
 </nav>
 
@@ -337,9 +374,11 @@ const SEASON_KEY = 'supporters_freudental_season_v1';
 const MIGRATION_KEY = 'supporters_freudental_migrated_v2';
 const MIGRATION_3STATE_KEY = 'supporters_freudental_migrated_3state_v1';
 const MEMBER_AUTH_KEY = 'supporters_freudental_member_auth_v1'; // {id, token, syncUrl}
+const TICKET_SEEN_KEY = 'supporters_freudental_ticketseen_v1'; // Set der offenen Ticketabfragen, die das Mitglied schon gesehen hat (für den Tab-Punkt)
 let state = {
   members: [],         // [{id, name}]
   attendance: {},      // {matchId: [memberId, memberId, ...]}  matchId hat Saison-Prefix
+  tickets: {},         // {matchId: {status:'open'|'closed', openedAt, closedAt, interested:{memberId:true}}}
   currentMatchId: null,
   seasonId: FALLBACK_SEASON_ID,
   filter: 'all',
@@ -349,6 +388,7 @@ let state = {
 };
 // Member-Auth: gesetzt sobald per URL-Hash oder localStorage erkannt
 let memberAuth = null; // {id, token, syncUrl}
+let ticketSeen = new Set(); // matchIds offener Ticketabfragen, die das Mitglied schon gesehen hat
 let syncConfig = {url:'', token:'', userName:'', autoSync:true};
 let pendingOps = [];     // Operationen, die noch nicht in die Cloud geschoben wurden
 let syncStatus = 'idle'; // idle | syncing | ok | error | offline
@@ -363,6 +403,7 @@ function loadState(){
       const parsed = JSON.parse(raw);
       state.members = parsed.members || [];
       state.attendance = parsed.attendance || {};
+      state.tickets = parsed.tickets || {};
     }
   }catch(e){console.error('Load failed',e)}
   try{
@@ -380,6 +421,10 @@ function loadState(){
   try{
     const s = localStorage.getItem(SEASON_KEY);
     if(s) state.seasonId = s;
+  }catch(e){}
+  try{
+    const raw = localStorage.getItem(TICKET_SEEN_KEY);
+    if(raw) ticketSeen = new Set(JSON.parse(raw)||[]);
   }catch(e){}
   migrateAttendanceIds();
   migrateAttendanceTo3State();
@@ -575,7 +620,7 @@ function setSeason(seasonId){
 }
 function saveState(){
   try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({members:state.members, attendance:state.attendance}));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({members:state.members, attendance:state.attendance, tickets:state.tickets}));
   }catch(e){toast('Speichern fehlgeschlagen')}
 }
 function saveSyncConfig(){
@@ -583,6 +628,9 @@ function saveSyncConfig(){
 }
 function savePending(){
   try{ localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); }catch(e){}
+}
+function saveTicketSeen(){
+  try{ localStorage.setItem(TICKET_SEEN_KEY, JSON.stringify([...ticketSeen])); }catch(e){}
 }
 function queueOp(op){
   pendingOps.push(op);
@@ -665,6 +713,14 @@ function voteLockSinceStr(m){
   return d.toLocaleDateString('de-DE');
 }
 function matchById(id){ return SCHEDULE.find(x=>x.id===id) || null; }
+// Sucht ein Spiel über ALLE geladenen Saisons (Tickets sind saison-übergreifend).
+function anyMatchById(id){
+  for(const sid in SCHEDULES){
+    const found = (SCHEDULES[sid]||[]).find(x=>x.id===id);
+    if(found) return found;
+  }
+  return null;
+}
 
 // Darf der eingeloggte Member dieses Spiel direkt in der Liste abstimmen?
 // Nur Mitglieder, nur ungesperrte Spiele, und nur im Aktionsfenster:
@@ -714,6 +770,21 @@ function applyOpLocally(op){
     else if(op.present === true) obj[memberId] = 'present';
     else if(op.present === false) obj[memberId] = 'absent';
     if(Object.keys(obj).length === 0) delete state.attendance[op.matchId];
+  } else if(op.op === 'openTicketSurvey'){
+    const t = state.tickets[op.matchId];
+    state.tickets[op.matchId] = {status:'open', openedAt:(t&&t.openedAt)||new Date().toISOString(), closedAt:null, interested:(t&&t.interested)||{}};
+  } else if(op.op === 'closeTicketSurvey'){
+    const t = state.tickets[op.matchId];
+    if(t){ t.status='closed'; t.closedAt=new Date().toISOString(); }
+  } else if(op.op === 'deleteTicketSurvey'){
+    delete state.tickets[op.matchId];
+  } else if(op.op === 'setTicketInterest'){
+    const memberId = state.role === 'member' ? state.myMemberId : op.memberId;
+    if(!memberId) return;
+    const t = state.tickets[op.matchId];
+    if(!t || t.status !== 'open') return;
+    if(op.interested === true) t.interested[memberId] = true;
+    else delete t.interested[memberId];
   }
 }
 
@@ -764,6 +835,7 @@ const ui = {
     if(name==='dashboard') ui.renderDashboard();
     if(name==='matches'){ ui.renderFilterChips(); ui.renderMatches(); }
     if(name==='members') ui.renderMembers();
+    if(name==='tickets') ui.renderTickets();
     if(name==='stats'){ ui.renderStatChips(); ui.renderStats(); }
     // Beim Zurück zur Match-Liste vorherige Position wiederherstellen
     if(name === 'matches'){
@@ -1046,6 +1118,7 @@ const ui = {
   },
   renderAttendance(){
     const id = state.currentMatchId;
+    ui.renderMatchTicketControl();
     const total = state.members.length;
     const c = getStatusCounts(id);
     // Summenzeile: dabei / nicht dabei / offen (für Auswärts-Planung)
@@ -1155,6 +1228,168 @@ const ui = {
       ui.renderAttendance();
       toast('Zur&uuml;ckgesetzt');
     });
+  },
+  // === TICKETABFRAGEN ===
+  // Admin-Steuerung im Spiel-Detail (starten / schließen / wieder öffnen).
+  renderMatchTicketControl(){
+    const host = $('#md-ticket');
+    if(!host) return;
+    const id = state.currentMatchId;
+    const t = state.tickets[id];
+    const n = t ? Object.keys(t.interested||{}).length : 0;
+    if(!t){
+      host.innerHTML = `<button class="btn btn-sec btn-block" onclick="ui.startTicketSurvey('${id}')">&#127915; Ticketabfrage starten</button>`;
+    } else if(t.status === 'open'){
+      host.innerHTML = `<div class="md-ticket-bar open">
+          <div class="md-ticket-info"><span class="md-ticket-lbl">&#127915; Ticketabfrage l&auml;uft</span><span class="md-ticket-n">${n} ${n===1?'will':'wollen'} ein Ticket</span></div>
+          <button class="btn btn-sec" onclick="ui.closeTicketSurvey('${id}')">Schlie&szlig;en</button>
+        </div>`;
+    } else {
+      host.innerHTML = `<div class="md-ticket-bar closed">
+          <div class="md-ticket-info"><span class="md-ticket-lbl">&#128274; Abfrage eingefroren</span><span class="md-ticket-n">${n} ${n===1?'wollte':'wollten'} ein Ticket</span></div>
+          <button class="btn btn-sec" onclick="ui.reopenTicketSurvey('${id}')">Wieder &ouml;ffnen</button>
+        </div>`;
+    }
+  },
+  renderTickets(){
+    const host = $('#tickets-list');
+    if(!host) return;
+    const isMember = state.role === 'member' && state.myMemberId;
+    const entries = Object.keys(state.tickets)
+      .map(id => ({id, t:state.tickets[id], m:anyMatchById(id)}))
+      .filter(e => e.m); // Spiele, die nicht (mehr) auflösbar sind, überspringen
+    const open = entries.filter(e=>e.t.status==='open').sort((a,b)=>a.m.date.localeCompare(b.m.date));
+    const closed = entries.filter(e=>e.t.status!=='open').sort((a,b)=>b.m.date.localeCompare(a.m.date));
+    if(entries.length===0){
+      host.innerHTML = `<div class="empty"><div class="ic">&#127915;</div>${isMember
+        ? 'Aktuell keine Ticketabfragen.<br><span class="muted">Sobald der Fanclub Karten abfragt, erscheint sie hier.</span>'
+        : 'Noch keine Ticketabfragen.<br><span class="muted">Starte eine Abfrage im Detail eines Spiels &ndash; Button &bdquo;Ticketabfrage starten&ldquo;.</span>'}</div>`;
+    } else {
+      let html = '';
+      if(open.length){ html += '<div class="section-title">Laufend</div>' + open.map(e=>ui.ticketCard(e.m, e.t, false)).join(''); }
+      if(closed.length){ html += '<div class="section-title">Abgeschlossen</div>' + closed.map(e=>ui.ticketCard(e.m, e.t, true)).join(''); }
+      host.innerHTML = html;
+    }
+    if(isMember) ui.markTicketsSeen();
+    ui.updateTicketTabBadge();
+  },
+  ticketCard(m, t, frozen){
+    const isMember = state.role === 'member' && state.myMemberId;
+    const interested = t.interested || {};
+    const n = Object.keys(interested).length;
+    const names = state.members.filter(mem=>interested[mem.id]).map(mem=>mem.name.split(' ')[0]);
+    const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
+    const mine = isMember && !!interested[state.myMemberId];
+    let action = '';
+    if(isMember){
+      action = frozen
+        ? `<div class="ticket-frozen-note">&#128274; Eingefroren &middot; du: ${mine ? '<strong>dabei</strong>' : 'nicht eingetragen'}</div>`
+        : `<button class="ticket-toggle ${mine?'on':''}" onclick="ui.toggleTicketInterest('${m.id}')">${mine ? '&#10003; Ich nehme ein Ticket' : 'Ich nehme ein Ticket'}</button>`;
+    } else {
+      action = frozen
+        ? `<div class="ticket-admin-actions">
+             <button class="btn btn-sec" onclick="ui.reopenTicketSurvey('${m.id}')">Wieder &ouml;ffnen</button>
+             <button class="btn btn-sec ticket-del" onclick="ui.deleteTicketSurvey('${m.id}')">L&ouml;schen</button>
+           </div>`
+        : `<div class="ticket-admin-actions">
+             <button class="btn btn-sec" onclick="ui.closeTicketSurvey('${m.id}')">Schlie&szlig;en</button>
+             <button class="btn btn-sec ticket-del" onclick="ui.deleteTicketSurvey('${m.id}')">L&ouml;schen</button>
+           </div>`;
+    }
+    const namesHtml = n>0
+      ? `<div class="ticket-names">${names.map(escapeHtml).join(', ')}</div>`
+      : `<div class="ticket-names muted">Noch niemand eingetragen</div>`;
+    return `<div class="card ticket-card ${frozen?'frozen':''}">
+      <div class="ticket-hdr">
+        <span class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</span>
+        <span class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</span>
+        <span class="ticket-date">${fmtDateShort(m.date)}</span>
+      </div>
+      <div class="ticket-teams">${escapeHtml(matchTitle)}</div>
+      <div class="ticket-count"><span class="ticket-count-n">${n}</span> ${n===1?'Person will':'Personen wollen'} ein Ticket</div>
+      ${namesHtml}
+      ${action}
+    </div>`;
+  },
+  startTicketSurvey(matchId){
+    if(state.role === 'member') return;
+    const t = state.tickets[matchId];
+    state.tickets[matchId] = {status:'open', openedAt:(t&&t.openedAt)||new Date().toISOString(), closedAt:null, interested:(t&&t.interested)||{}};
+    queueOp({op:'openTicketSurvey', matchId});
+    saveState();
+    ui.afterTicketChange();
+    toast('Ticketabfrage gestartet');
+  },
+  closeTicketSurvey(matchId){
+    if(state.role === 'member') return;
+    const t = state.tickets[matchId];
+    if(!t) return;
+    const n = Object.keys(t.interested||{}).length;
+    ui.confirm(`<strong>Abfrage schlie&szlig;en?</strong><br>Die Liste (${n} Interessent${n===1?'':'en'}) wird eingefroren. Mitglieder k&ouml;nnen dann nichts mehr &auml;ndern. Du kannst sie sp&auml;ter wieder &ouml;ffnen.`, ()=>{
+      t.status='closed'; t.closedAt=new Date().toISOString();
+      queueOp({op:'closeTicketSurvey', matchId});
+      saveState();
+      ui.afterTicketChange();
+      toast('Abfrage geschlossen &#10003;');
+    });
+  },
+  reopenTicketSurvey(matchId){
+    if(state.role === 'member') return;
+    const t = state.tickets[matchId];
+    if(!t) return;
+    t.status='open'; t.closedAt=null;
+    queueOp({op:'openTicketSurvey', matchId});
+    saveState();
+    ui.afterTicketChange();
+    toast('Abfrage wieder ge&ouml;ffnet');
+  },
+  deleteTicketSurvey(matchId){
+    if(state.role === 'member') return;
+    ui.confirm('<strong>Abfrage l&ouml;schen?</strong><br>Die Ticketabfrage und alle Eintr&auml;ge werden entfernt. Das l&auml;sst sich nicht r&uuml;ckg&auml;ngig machen.', ()=>{
+      delete state.tickets[matchId];
+      queueOp({op:'deleteTicketSurvey', matchId});
+      saveState();
+      ui.afterTicketChange();
+      toast('Abfrage gel&ouml;scht');
+    });
+  },
+  toggleTicketInterest(matchId){
+    const t = state.tickets[matchId];
+    if(!t || t.status !== 'open'){ toast('Abfrage ist geschlossen'); return; }
+    const memberId = state.role === 'member' ? state.myMemberId : null;
+    if(!memberId){ toast('Nur f&uuml;r Mitglieder'); return; }
+    const now = !!t.interested[memberId];
+    if(now) delete t.interested[memberId]; else t.interested[memberId] = true;
+    queueOp({op:'setTicketInterest', matchId, interested: !now});
+    saveState();
+    ui.afterTicketChange();
+  },
+  // Nach jeder Ticket-Änderung: sichtbare Seite neu rendern + Tab-Punkt aktualisieren.
+  afterTicketChange(){
+    const active = document.querySelector('.page.active');
+    const name = active ? active.id.replace('page-','') : '';
+    if(name === 'tickets') ui.renderTickets();
+    if(name === 'match-detail') ui.renderMatchTicketControl();
+    ui.updateTicketTabBadge();
+  },
+  markTicketsSeen(){
+    let changed = false;
+    Object.keys(state.tickets).forEach(id=>{
+      if(state.tickets[id].status==='open' && !ticketSeen.has(id)){ ticketSeen.add(id); changed = true; }
+    });
+    if(changed) saveTicketSeen();
+  },
+  updateTicketTabBadge(){
+    const dot = $('#ticketTabDot');
+    if(!dot) return;
+    let show = false;
+    if(state.role === 'member' && state.myMemberId){
+      show = Object.keys(state.tickets).some(id=>{
+        const t = state.tickets[id];
+        return t && t.status==='open' && !ticketSeen.has(id);
+      });
+    }
+    dot.hidden = !show;
   },
   renderMembers(){
     if(state.members.length===0){
@@ -1501,6 +1736,7 @@ const ui = {
       // Server-State übernehmen
       state.members = data.data.members || [];
       state.attendance = data.data.attendance || {};
+      state.tickets = data.data.tickets || {};
       // Nur die Ops verwerfen, die wir wirklich gesendet haben - in der Zwischenzeit
       // können durch User-Taps neue Ops dazugekommen sein.
       pendingOps.splice(0, opsCount);
@@ -1519,6 +1755,7 @@ const ui = {
       // Aktive Seite neu rendern - Header auch, da im Member-Modus der eigene
       // Name erst nach dem Pull bekannt ist
       ui.renderHeaderSeason();
+      ui.updateTicketTabBadge();
       const active = document.querySelector('.page.active');
       if(active){
         const name = active.id.replace('page-','');
@@ -1621,8 +1858,11 @@ const ui = {
     ui.confirm('<strong>Wirklich alle Daten l&ouml;schen?</strong><br>Mitglieder und alle Anwesenheits-Eintr&auml;ge gehen verloren.<br><br>Tipp: Vorher Export machen!', ()=>{
       state.members = [];
       state.attendance = {};
+      state.tickets = {};
+      ticketSeen = new Set(); saveTicketSeen();
       saveState();
       ui.closeModal();
+      ui.updateTicketTabBadge();
       ui.showPage('dashboard');
       toast('Alle Daten gel&ouml;scht');
     });
@@ -1720,6 +1960,7 @@ async function init(){
   ui.computeCurrentMatchList(); // für Navigation in Match-Detail vorbereiten
   ui.showPage('dashboard');
   ui.updateSyncIndicator();
+  ui.updateTicketTabBadge();
   const a = activeSync();
   if(a.url){
     setTimeout(()=>ui.sync(true), 800);
