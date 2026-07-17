@@ -800,6 +800,8 @@ const fmtDateShort = iso => {
   const d = new Date(iso);
   return String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0') + '.';
 };
+// Anstoßzeit (HH:MM) -> "HH:MM Uhr"; leer, falls noch nicht terminiert.
+const fmtTime = t => t ? t + ' Uhr' : '';
 const COMP_TYPES = ['BL','DFB','EL','CL','SC'];
 const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', CL:'badge-cl', SC:'badge-sc'})[t] || 'badge-bl';
 const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup'})[t] || t;
@@ -992,7 +994,7 @@ const ui = {
         <span class="hero-loc ${next.loc==='H'?'h':'a'}">${next.loc==='H'?'HEIM':'AUSW.'}</span>
       </div>
       <div class="hero-teams">${escapeHtml(matchTitle)}</div>
-      <div class="hero-meta">${fmtDateShort(next.date)} &middot; ${escapeHtml(next.round||'')}</div>
+      <div class="hero-meta">${fmtDateShort(next.date)}${next.time?' &middot; '+fmtTime(next.time):''} &middot; ${escapeHtml(next.round||'')}</div>
       ${countsHtml}
       ${voteHtml}
     </div>`;
@@ -1047,7 +1049,7 @@ const ui = {
     }
     return `<div class="match" onclick="ui.openMatch('${m.id}')">
       <div class="match-hdr">
-        <div class="match-date">${fmtDateShort(m.date)}</div>
+        <div class="match-date">${fmtDateShort(m.date)}${m.time?' &middot; '+m.time:''}</div>
         <div class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</div>
         ${myIcon}
         <div class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>
@@ -1078,7 +1080,7 @@ const ui = {
     if(ui.currentMatchList.length === 0) ui.computeCurrentMatchList();
     const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
     $('#md-title').innerHTML = escapeHtml(matchTitle);
-    $('#md-meta').innerHTML = `${fmtDate(m.date)} &middot; ${typeName(m.type)} &middot; ${escapeHtml(m.round)} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
+    $('#md-meta').innerHTML = `${fmtDate(m.date)}${m.time?' &middot; '+fmtTime(m.time):''} &middot; ${typeName(m.type)} &middot; ${escapeHtml(m.round)} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
     ui.updateMatchNav(id);
     ui.renderAttendance();
     ui.showPage('match-detail');
