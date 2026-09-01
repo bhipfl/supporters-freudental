@@ -1,8 +1,8 @@
 {
   "id": "2627",
   "label": "Saison 2026/27",
-  "source": "OpenLigaDB (bl1/2026, dfb/2026), gegengeprüft mit bundesliga.com; Spieltage 1-4 zeitgenau angesetzt, ab Spieltag 5 Rahmentermine (Wochentag/Anstoßzeit noch offen)",
-  "updated": "2026-08-17",
+  "source": "BL/DFB: OpenLigaDB (bl1/2026, dfb/2026), gegengeprüft mit bundesliga.com — Spieltage 1-4 zeitgenau angesetzt, ab Spieltag 5 Rahmentermine (Wochentag/Anstoßzeit noch offen). CL-Ligaphase: vfb.de, gegengeprüft mit Stuttgarter Zeitung — alle 8 Spiele zeitgenau angesetzt",
+  "updated": "2026-09-01",
   "matches": [
     { "id": "dfb1", "date": "2026-08-21", "type": "DFB", "loc": "A", "opp": "Hansa Rostock", "round": "1. Runde" },
     { "id": "bl1", "date": "2026-08-28", "time": "20:30", "type": "BL", "loc": "A", "opp": "Bayern München", "round": "1. Spieltag" },
@@ -38,6 +38,14 @@
     { "id": "bl31", "date": "2027-04-24", "type": "BL", "loc": "H", "opp": "SC Freiburg", "round": "31. Spieltag" },
     { "id": "bl32", "date": "2027-05-08", "type": "BL", "loc": "A", "opp": "FC Augsburg", "round": "32. Spieltag" },
     { "id": "bl33", "date": "2027-05-15", "type": "BL", "loc": "H", "opp": "RB Leipzig", "round": "33. Spieltag" },
-    { "id": "bl34", "date": "2027-05-22", "type": "BL", "loc": "A", "opp": "1. FSV Mainz 05", "round": "34. Spieltag" }
+    { "id": "bl34", "date": "2027-05-22", "type": "BL", "loc": "A", "opp": "1. FSV Mainz 05", "round": "34. Spieltag" },
+    { "id": "cl1", "date": "2026-09-09", "time": "18:45", "type": "CL", "loc": "H", "opp": "Viking Stavanger", "round": "Ligaphase 1" },
+    { "id": "cl2", "date": "2026-10-14", "time": "21:00", "type": "CL", "loc": "A", "opp": "Slovan Bratislava", "round": "Ligaphase 2" },
+    { "id": "cl3", "date": "2026-10-20", "time": "21:00", "type": "CL", "loc": "H", "opp": "Atlético Madrid", "round": "Ligaphase 3" },
+    { "id": "cl4", "date": "2026-11-03", "time": "18:45", "type": "CL", "loc": "A", "opp": "Galatasaray Istanbul", "round": "Ligaphase 4" },
+    { "id": "cl5", "date": "2026-11-25", "time": "21:00", "type": "CL", "loc": "A", "opp": "Inter Mailand", "round": "Ligaphase 5" },
+    { "id": "cl6", "date": "2026-12-09", "time": "21:00", "type": "CL", "loc": "H", "opp": "OSC Lille", "round": "Ligaphase 6" },
+    { "id": "cl7", "date": "2027-01-19", "time": "21:00", "type": "CL", "loc": "H", "opp": "Club Brügge", "round": "Ligaphase 7" },
+    { "id": "cl8", "date": "2027-01-27", "time": "21:00", "type": "CL", "loc": "A", "opp": "PSV Eindhoven", "round": "Ligaphase 8" }
   ]
 }
