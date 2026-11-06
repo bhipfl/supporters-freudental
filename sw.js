@@ -3,7 +3,7 @@
  * Ermöglicht Offline-Nutzung: cached die App-Dateien beim ersten Besuch,
  * danach läuft die App auch ohne Internetverbindung (Daten in localStorage).
  */
-const CACHE_NAME = 'supporters-freudental-v18';
+const CACHE_NAME = 'supporters-freudental-v19';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -43,8 +43,16 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  // Die App-Shell (index.html) immer gegen den Server revalidieren, damit sie
+  // nicht aus dem HTTP-Cache kommt. Die Spielplan-Daten werden in der App
+  // ohnehin mit cache:'no-cache' geladen - ohne das hier koennten frische Daten
+  // auf eine alte App-Version treffen. Offline greift weiter der Cache-Fallback.
+  const isShell = req.mode === 'navigate' ||
+                  url.pathname.endsWith('/') ||
+                  url.pathname.endsWith('/index.html');
+
   event.respondWith(
-    fetch(req)
+    (isShell ? fetch(req.url, { cache: 'no-cache' }) : fetch(req))
       .then(resp => {
         if (resp && resp.status === 200) {
           const respClone = resp.clone();

@@ -813,13 +813,16 @@ const typeShort = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa', CL:'Cham
 // Fußball-Statistik heraus.
 const isEvent = m => !!m && m.type === 'EV';
 // Anzeigename einer Spielplan-Zeile. short=true für enge Stellen (Detail, Ticket).
+// Faellt auf title/round zurueck, sobald kein Gegner da ist. Das deckt nicht nur
+// Vereinstermine ab, sondern auch den Fall "neue Daten treffen alte App-Version":
+// lieber ein brauchbarer Name als "undefined - VfB".
 const entryTitle = (m, short) => {
-  if(isEvent(m)) return m.title || m.round || 'Vereinstermin';
+  if(isEvent(m) || !m.opp) return m.title || m.round || 'Termin';
   const vfb = short ? 'VfB' : 'VfB Stuttgart';
   return m.loc === 'H' ? `${vfb} - ${m.opp}` : `${m.opp} - ${vfb}`;
 };
-// Heim/Auswärts-Pille: für Termine gibt es sie nicht.
-const locPill = (m, cls) => isEvent(m) ? '' :
+// Heim/Auswärts-Pille: für Termine und Eintraege ohne Heimrecht gibt es sie nicht.
+const locPill = (m, cls) => (isEvent(m) || !m.loc) ? '' :
   `<div class="${cls} ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>`;
 const initials = name => name.split(' ').filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
@@ -1095,7 +1098,7 @@ const ui = {
     if(ui.currentMatchList.length === 0) ui.computeCurrentMatchList();
     const matchTitle = entryTitle(m, true);
     $('#md-title').innerHTML = escapeHtml(matchTitle);
-    $('#md-meta').innerHTML = `${fmtDate(m.date)}${m.time?' &middot; '+fmtTime(m.time):''} &middot; ${typeName(m.type)}${m.round?' &middot; '+escapeHtml(m.round):''}${isEvent(m)?'':' &middot; '+(m.loc==='H'?'Heim':'Ausw&auml;rts')}`;
+    $('#md-meta').innerHTML = `${fmtDate(m.date)}${m.time?' &middot; '+fmtTime(m.time):''} &middot; ${typeName(m.type)}${m.round?' &middot; '+escapeHtml(m.round):''}${(isEvent(m)||!m.loc)?'':' &middot; '+(m.loc==='H'?'Heim':'Ausw&auml;rts')}`;
     ui.updateMatchNav(id);
     ui.renderAttendance();
     ui.showPage('match-detail');
@@ -1962,10 +1965,25 @@ if(isIOS() && !isStandalone() && !localStorage.getItem('install_dismissed')){
   }, 2000);
 }
 
-// Service Worker registrieren für Offline-Support
+// Service Worker registrieren für Offline-Support.
+// updateViaCache:'none' -> sw.js wird nie aus dem HTTP-Cache bedient, neue
+// Versionen werden also zuverlässig erkannt. Übernimmt ein neuer Worker die
+// Kontrolle (skipWaiting + clients.claim), laden wir die Seite EINMAL neu.
+// Sonst kann es passieren, dass frische Spielplan-Daten (die immer mit
+// cache:'no-cache' geholt werden) auf eine alte, gecachte App-Version treffen.
 if('serviceWorker' in navigator){
+  const hadController = !!navigator.serviceWorker.controller;
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    // Beim allerersten Install gab es noch keinen Controller - da nicht neu laden.
+    if(!hadController || swReloaded) return;
+    swReloaded = true;
+    location.reload();
+  });
   window.addEventListener('load', ()=>{
-    navigator.serviceWorker.register('sw.js').catch(err=>console.log('SW-Fehler:', err));
+    navigator.serviceWorker.register('sw.js', {updateViaCache:'none'})
+      .then(reg=>{ try{ reg.update(); }catch(e){} })
+      .catch(err=>console.log('SW-Fehler:', err));
   });
 }
 
