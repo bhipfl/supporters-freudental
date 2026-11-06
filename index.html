@@ -72,6 +72,7 @@ header .head-actions button{background:rgba(255,255,255,.18);border:0;color:#fff
 .badge-el{background:#fff3e0;color:#e67e00}
 .badge-cl{background:#e6f0fb;color:#0c3a85}
 .badge-sc{background:#f0e8fd;color:#7b3fbf}
+.badge-ev{background:#e6f6ea;color:#1f8a3a}
 .match-loc{margin-left:auto;font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px}
 .match-loc.h{background:#e7f6ec;color:#1f8a3a}
 .match-loc.a{background:#fef1f0;color:#b22d24}
@@ -802,10 +803,24 @@ const fmtDateShort = iso => {
 };
 // Anstoßzeit (HH:MM) -> "HH:MM Uhr"; leer, falls noch nicht terminiert.
 const fmtTime = t => t ? t + ' Uhr' : '';
-const COMP_TYPES = ['BL','DFB','EL','CL','SC'];
-const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', CL:'badge-cl', SC:'badge-sc'})[t] || 'badge-bl';
-const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup'})[t] || t;
-const typeShort = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa', CL:'Champions', SC:'Supercup'})[t] || t;
+const COMP_TYPES = ['BL','DFB','EL','CL','SC','EV'];
+const typeBadge = t => ({BL:'badge-bl', DFB:'badge-dfb', EL:'badge-el', CL:'badge-cl', SC:'badge-sc', EV:'badge-ev'})[t] || 'badge-bl';
+const typeName = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup', EV:'Vereinstermin'})[t] || t;
+const typeShort = t => ({BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa', CL:'Champions', SC:'Supercup', EV:'Termine'})[t] || t;
+// Vereinstermine (Mitgliederversammlung, Weihnachtsmarkt-Stand, ...) sind keine
+// Spiele: kein Gegner, kein Heim/Auswärts. Der Name steht im Feld "title", die
+// Art in "round". Sie zählen in einer EIGENEN Quote und bleiben damit aus der
+// Fußball-Statistik heraus.
+const isEvent = m => !!m && m.type === 'EV';
+// Anzeigename einer Spielplan-Zeile. short=true für enge Stellen (Detail, Ticket).
+const entryTitle = (m, short) => {
+  if(isEvent(m)) return m.title || m.round || 'Vereinstermin';
+  const vfb = short ? 'VfB' : 'VfB Stuttgart';
+  return m.loc === 'H' ? `${vfb} - ${m.opp}` : `${m.opp} - ${vfb}`;
+};
+// Heim/Auswärts-Pille: für Termine gibt es sie nicht.
+const locPill = (m, cls) => isEvent(m) ? '' :
+  `<div class="${cls} ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>`;
 const initials = name => name.split(' ').filter(Boolean).map(p=>p[0]).join('').slice(0,2).toUpperCase();
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
 function toast(msg){
@@ -969,7 +984,7 @@ const ui = {
     const md = new Date(next.date + 'T00:00:00');
     const diffDays = Math.round((md - today) / 86400000);
     const countdown = diffDays <= 0 ? 'Heute' : diffDays === 1 ? 'Morgen' : 'in ' + diffDays + ' Tagen';
-    const matchTitle = next.loc==='H' ? `VfB Stuttgart - ${next.opp}` : `${next.opp} - VfB Stuttgart`;
+    const matchTitle = entryTitle(next);
     const c = getStatusCounts(next.id);
     const countsHtml = `<div class="hero-counts">
         <span class="sum sum-yes">&#10003; ${c.present} dabei</span>
@@ -991,7 +1006,7 @@ const ui = {
       <div class="hero-top">
         <span class="hero-countdown">${countdown}</span>
         <span class="match-badge ${typeBadge(next.type)}">${typeName(next.type)}</span>
-        <span class="hero-loc ${next.loc==='H'?'h':'a'}">${next.loc==='H'?'HEIM':'AUSW.'}</span>
+        <span class="hero-loc ${next.loc==='H'?'h':'a'}" ${isEvent(next)?'hidden':''}>${next.loc==='H'?'HEIM':'AUSW.'}</span>
       </div>
       <div class="hero-teams">${escapeHtml(matchTitle)}</div>
       <div class="hero-meta">${fmtDateShort(next.date)}${next.time?' &middot; '+fmtTime(next.time):''} &middot; ${escapeHtml(next.round||'')}</div>
@@ -1026,7 +1041,7 @@ const ui = {
   },
   matchCard(m){
     const att = getPresentMembers(m.id).length;
-    const matchTitle = m.loc==='H' ? `VfB Stuttgart - ${m.opp}` : `${m.opp} - VfB Stuttgart`;
+    const matchTitle = entryTitle(m);
     const isMember = state.role === 'member' && state.myMemberId;
     const myStatus = isMember ? getStatus(m.id, state.myMemberId) : undefined;
     const votable = isMember && isQuickVotable(m);
@@ -1052,11 +1067,11 @@ const ui = {
         <div class="match-date">${fmtDateShort(m.date)}${m.time?' &middot; '+m.time:''}</div>
         <div class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</div>
         ${myIcon}
-        <div class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</div>
+        ${locPill(m, 'match-loc')}
       </div>
-      <div class="match-teams">${matchTitle}</div>
+      <div class="match-teams">${escapeHtml(matchTitle)}</div>
       <div class="match-stats">
-        <span>${m.round}</span>
+        <span>${escapeHtml(m.round||'')}</span>
         <div class="match-stats-right">
           <span class="attendance-pill ${att===0?'zero':''}">${att} Fan${att===1?'':'s'} dabei</span>
           ${voteBtns}
@@ -1078,9 +1093,9 @@ const ui = {
     if(!m) return;
     // Falls computeCurrentMatchList noch nicht gelaufen ist (z.B. direkt vom Dashboard)
     if(ui.currentMatchList.length === 0) ui.computeCurrentMatchList();
-    const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
+    const matchTitle = entryTitle(m, true);
     $('#md-title').innerHTML = escapeHtml(matchTitle);
-    $('#md-meta').innerHTML = `${fmtDate(m.date)}${m.time?' &middot; '+fmtTime(m.time):''} &middot; ${typeName(m.type)} &middot; ${escapeHtml(m.round)} &middot; ${m.loc==='H'?'Heim':'Ausw&auml;rts'}`;
+    $('#md-meta').innerHTML = `${fmtDate(m.date)}${m.time?' &middot; '+fmtTime(m.time):''} &middot; ${typeName(m.type)}${m.round?' &middot; '+escapeHtml(m.round):''}${isEvent(m)?'':' &middot; '+(m.loc==='H'?'Heim':'Ausw&auml;rts')}`;
     ui.updateMatchNav(id);
     ui.renderAttendance();
     ui.showPage('match-detail');
@@ -1098,15 +1113,19 @@ const ui = {
     nextBtn.dataset.id = next ? next.id : '';
     const prevSub = $('#nav-prev-sub');
     const nextSub = $('#nav-next-sub');
+    // Kurzlabel: bei Spielen der Gegner, bei Vereinsterminen der Titel
+    // (m.opp existiert dort nicht).
+    const navLabel = x => {
+      const s = isEvent(x) ? entryTitle(x) : (x.opp || '');
+      return s.length > 18 ? s.slice(0,17)+'…' : s;
+    };
     if(prev){
-      const opp = prev.opp.length > 18 ? prev.opp.slice(0,17)+'…' : prev.opp;
-      prevSub.textContent = fmtDateShort(prev.date) + ' ' + opp;
+      prevSub.textContent = fmtDateShort(prev.date) + ' ' + navLabel(prev);
     } else {
       prevSub.innerHTML = '&nbsp;';
     }
     if(next){
-      const opp = next.opp.length > 18 ? next.opp.slice(0,17)+'…' : next.opp;
-      nextSub.textContent = fmtDateShort(next.date) + ' ' + opp;
+      nextSub.textContent = fmtDateShort(next.date) + ' ' + navLabel(next);
     } else {
       nextSub.innerHTML = '&nbsp;';
     }
@@ -1280,7 +1299,7 @@ const ui = {
     const interested = t.interested || {};
     const n = Object.keys(interested).length;
     const names = state.members.filter(mem=>interested[mem.id]).map(mem=>mem.name.split(' ')[0]);
-    const matchTitle = m.loc==='H' ? `VfB - ${m.opp}` : `${m.opp} - VfB`;
+    const matchTitle = entryTitle(m, true);
     const mine = isMember && !!interested[state.myMemberId];
     let action = '';
     if(isMember){
@@ -1304,7 +1323,7 @@ const ui = {
     return `<div class="card ticket-card ${frozen?'frozen':''}">
       <div class="ticket-hdr">
         <span class="match-badge ${typeBadge(m.type)}">${typeName(m.type)}</span>
-        <span class="match-loc ${m.loc==='H'?'h':'a'}">${m.loc==='H'?'HEIM':'AUSW.'}</span>
+        ${locPill(m, 'match-loc')}
         <span class="ticket-date">${fmtDateShort(m.date)}</span>
       </div>
       <div class="ticket-teams">${escapeHtml(matchTitle)}</div>
@@ -1477,27 +1496,33 @@ const ui = {
       toast('Gel&ouml;scht');
     });
   },
+  // filter: 'all' = nur Spiele, 'H'/'A' = nur Spiele mit diesem Heimrecht,
+  // ein Wettbewerbs-Typ, oder 'EV' = nur Vereinstermine. 'all' laesst Termine
+  // bewusst weg, damit die Fussball-Quote unveraendert bleibt.
   computeRanking(filter){
-    const matches = SCHEDULE.filter(m=>{
-      if(filter==='H') return m.loc==='H';
-      if(filter==='A') return m.loc==='A';
+    const entries = SCHEDULE.filter(m=>{
+      if(filter==='H') return !isEvent(m) && m.loc==='H';
+      if(filter==='A') return !isEvent(m) && m.loc==='A';
       if(COMP_TYPES.includes(filter)) return m.type===filter;
-      return true;
+      return !isEvent(m);
     });
-    const matchIds = matches.map(m=>m.id);
-    const possible = matchIds.length;
-    const locById = {};
-    matches.forEach(m=>locById[m.id]=m.loc);
+    const ids = entries.map(m=>m.id);
+    const possible = ids.length;
+    const byId = {};
+    entries.forEach(m=>byId[m.id]=m);
+    const eventsOnly = entries.length>0 && entries.every(isEvent);
     return state.members.map(mem=>{
-      let h=0, a=0;
-      matchIds.forEach(mid=>{
-        if(isPresent(mid, mem.id)){
-          if(locById[mid]==='H') h++; else a++;
-        }
+      let h=0, a=0, ev=0;
+      ids.forEach(id=>{
+        if(!isPresent(id, mem.id)) return;
+        const m = byId[id];
+        if(isEvent(m)) ev++;
+        else if(m.loc==='H') h++;
+        else a++;
       });
-      const total = h+a;
+      const total = h+a+ev;
       const quota = possible>0 ? Math.round(total/possible*100) : 0;
-      return {id:mem.id, name:mem.name, h, a, total, quota, possible};
+      return {id:mem.id, name:mem.name, h, a, ev, total, quota, possible, eventsOnly};
     }).sort((x,y)=>y.total-x.total || y.quota-x.quota || x.name.localeCompare(y.name,'de'));
   },
   renderStats(){
@@ -1511,15 +1536,22 @@ const ui = {
       return;
     }
     const possible = rank[0]?.possible || 0;
-    const filterLabel = ({all:'Alle Wettbewerbe', H:'Heimspiele', A:'Ausw&auml;rtsspiele', BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup'})[state.statFilter];
-    $('#ranking-list').innerHTML = `<div class="muted" style="margin-bottom:10px;padding:0 4px">${filterLabel} - ${possible} m&ouml;gliche Spiele</div>` +
+    const filterLabel = ({all:'Alle Wettbewerbe', H:'Heimspiele', A:'Ausw&auml;rtsspiele', BL:'Bundesliga', DFB:'DFB-Pokal', EL:'Europa League', CL:'Champions League', SC:'Supercup', EV:'Vereinstermine'})[state.statFilter];
+    const onlyEvents = state.statFilter === 'EV';
+    const unit = onlyEvents
+      ? (possible===1 ? 'm&ouml;glicher Termin' : 'm&ouml;gliche Termine')
+      : (possible===1 ? 'm&ouml;gliches Spiel' : 'm&ouml;gliche Spiele');
+    $('#ranking-list').innerHTML = `<div class="muted" style="margin-bottom:10px;padding:0 4px">${filterLabel} - ${possible} ${unit}</div>` +
       rank.map((r,i)=>{
         const medal = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+        const detail = r.eventsOnly
+          ? `<span>&#128197; ${r.ev} dabei</span><span>${r.possible - r.ev} verpasst</span>`
+          : `<span>&#127968; ${r.h} Heim</span><span>&#9992; ${r.a} Ausw.</span><span>${r.total} gesamt</span>`;
         return `<div class="rank-row">
           <div class="rank-pos ${medal}">${i+1}</div>
           <div class="rank-info">
             <div class="rank-name">${escapeHtml(r.name)}</div>
-            <div class="rank-detail"><span>&#127968; ${r.h} Heim</span><span>&#9992; ${r.a} Ausw.</span><span>${r.total} gesamt</span></div>
+            <div class="rank-detail">${detail}</div>
             <div class="rank-bar"><div class="rank-bar-fill" style="width:${r.quota}%"></div></div>
           </div>
           <div class="rank-quota">${r.quota}%</div>
