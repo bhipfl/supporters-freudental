@@ -51,6 +51,6 @@
     { "id": "cl7", "date": "2027-01-19", "time": "21:00", "type": "CL", "loc": "H", "opp": "Club Brügge", "round": "Ligaphase 7" },
     { "id": "cl8", "date": "2027-01-27", "time": "21:00", "type": "CL", "loc": "A", "opp": "PSV Eindhoven", "round": "Ligaphase 8" },
 
-    { "id": "ev1", "date": "2026-11-29", "type": "EV", "title": "Weihnachtsmarkt-Stand", "round": "Essen & Getränke" }
+    { "id": "ev1", "date": "2026-11-29", "type": "EV", "title": "Adventszauber-Stand", "round": "Essen & Getränke" }
   ]
 }

@@ -48,13 +48,13 @@ Die Spielpläne liegen als JSON-Dateien im Ordner `fixtures/`. Pro Saison eine D
 
 Während die Spiele noch nicht veröffentlicht sind, kann die Saison-Datei einfach mit leerem `matches`-Array existieren. Die App zeigt der Saison dann den Hinweis "Spielplan wird vor Saisonbeginn ergänzt".
 
-### Vereinstermine (Mitgliederversammlung, Weihnachtsmarkt, …)
+### Vereinstermine (Mitgliederversammlung, Adventszauber, …)
 
 Neben Spielen lassen sich auch Vereinstermine erfassen — Mitglieder stimmen dort genauso mit "Dabei / Nicht dabei" ab. Ein Termin ist ein normaler Eintrag im `matches`-Array der Saison-Datei, aber mit `"type": "EV"`:
 
 ```json
 { "id": "ev1", "date": "2026-11-29", "type": "EV",
-  "title": "Weihnachtsmarkt-Stand", "round": "Essen & Getränke" }
+  "title": "Adventszauber-Stand", "round": "Essen & Getränke" }
 ```
 
 - `title` ist der angezeigte Name (bei Spielen wird er aus Gegner + Heimrecht gebaut, hier gibst du ihn direkt vor).
@@ -70,7 +70,7 @@ Eine Mitgliederversammlung legst du identisch an:
   "title": "Mitgliederversammlung", "round": "Jahreshauptversammlung" }
 ```
 
-**In der Statistik zählen Termine getrennt.** Es gibt einen eigenen Filter "Termine" mit eigener Quote; die Fußball-Quote unter "Gesamt" bleibt davon unberührt und enthält weiterhin nur Spiele. So verwässert ein Weihnachtsmarkt die Heim-/Auswärtsquote nicht. Das Backend muss dafür nicht angepasst werden — Anwesenheiten hängen nur an der ID.
+**In der Statistik zählen Termine getrennt.** Es gibt einen eigenen Filter "Termine" mit eigener Quote; die Fußball-Quote unter "Gesamt" bleibt davon unberührt und enthält weiterhin nur Spiele. So verwässert ein Adventszauber die Heim-/Auswärtsquote nicht. Das Backend muss dafür nicht angepasst werden — Anwesenheiten hängen nur an der ID.
 
 ## Self-Service für Mitglieder (Phase 1)
 
